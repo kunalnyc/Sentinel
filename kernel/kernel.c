@@ -1,6 +1,11 @@
 // Sentinel kernel main file
 // Entry point - first code the CPU runs after bootloader
 #include "../security/trust.h"
+#include "idt.h"
+
+// Actual definitions live here
+struct IDTEntry idt[256];
+struct IDTPointer idt_ptr;
 
 int cursor_row = 0;
 int cursor_col = 0;
@@ -40,6 +45,10 @@ void kernel_main(void)
     println("SentinelOS v0.1 - Booting...");
     println("Kernel loaded at 0x100000");
     println("Initializing security layer...");
+
+    // Initialize IDT
+    idt_init();
+    println("Interrupt Descriptor Table: ONLINE");
 
     // Register a trusted process
     unsigned char trusted_hash[32] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,
