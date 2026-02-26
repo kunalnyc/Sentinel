@@ -25,4 +25,6 @@ void kernel_main() {
    video[16] = 'S'; // Character 'S'
    video[17] = 0x0F;
    
+   // Keep kernel running forever
+    while(1) {}
 }
