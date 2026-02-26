@@ -18,8 +18,8 @@ struct TrustedProcess {
 #define MAX_TRUSTED_PROCESSES 256
 
 // The Trust Registry - lives in protected kernel memory
-struct TrustedProcess trust_registry[MAX_TRUSTED_PROCESSES];
-int registry_count = 0;
+extern struct TrustedProcess trust_registry[MAX_TRUSTED_PROCESSES];
+extern int registry_count;
 
 // Function signatures
 int verify_process(unsigned int token, unsigned char *hash);

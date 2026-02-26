@@ -1,5 +1,7 @@
 #include "trust.h"   // " " = our own file (local)
-
+// Actual definitions live here only
+struct TrustedProcess trust_registry[MAX_TRUSTED_PROCESSES];
+int registry_count = 0;
 // Register a trusted process into the registry
 void register_process(unsigned int token, char *name, unsigned char *hash, unsigned char trust_level)
 {
