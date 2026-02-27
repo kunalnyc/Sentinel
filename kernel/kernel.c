@@ -2,7 +2,7 @@
 // Entry point - first code the CPU runs after bootloader
 #include "../security/trust.h"
 #include "idt.h"
-
+#include "memory.h"
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -55,7 +55,11 @@ void kernel_main(void)
                                       17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
     register_process(1001, "shell", trusted_hash, TRUST_SYSTEM);
     println("Trust Registry: ONLINE");
-
+    memory_init();
+    println("Memory Manager: ONLINE");
+    // test allocation
+    unsigned int page = allocate_page();
+    println("First free page allocated!");
     // Test 1 - verify a TRUSTED process
     if(verify_process(1001, trusted_hash))
         println("shell process: ALLOWED ✓");
