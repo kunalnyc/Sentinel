@@ -6,6 +6,9 @@
 #include "memory.h"
 #include "scheduler.h"
 #include "keyboard.h"
+#include "timer.h"
+
+
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -72,6 +75,10 @@ void kernel_main(void)
     // inside kernel_main:
     keyboard_init();
     println("Keyboard Driver: ONLINE");
+
+    // inside kernel_main:
+    timer_init();
+    println("Timer Driver: ONLINE");
 
     int pid1 = create_process(0x200000, 1001);
     int pid2 = create_process(0x300000, 9999);
