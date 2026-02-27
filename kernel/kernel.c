@@ -1,8 +1,10 @@
 // Sentinel kernel main file
 // Entry point - first code the CPU runs after bootloader
 #include "../security/trust.h"
+#include "../security/sha256.h"
 #include "idt.h"
 #include "memory.h"
+
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -57,6 +59,12 @@ void kernel_main(void)
     println("Trust Registry: ONLINE");
     memory_init();
     println("Memory Manager: ONLINE");
+
+    // inside kernel_main after memory_init():
+unsigned char data[] = "SentinelOS";
+unsigned char hash[32];
+sha256_compute(data, 10, hash);
+println("SHA-256 Engine: ONLINE");
     // test allocation
     unsigned int page = allocate_page();
     println("First free page allocated!");
