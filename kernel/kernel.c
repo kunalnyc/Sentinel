@@ -4,7 +4,7 @@
 #include "../security/sha256.h"
 #include "idt.h"
 #include "memory.h"
-
+#include "scheduler.h"
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -61,10 +61,16 @@ void kernel_main(void)
     println("Memory Manager: ONLINE");
 
     // inside kernel_main after memory_init():
-unsigned char data[] = "SentinelOS";
-unsigned char hash[32];
-sha256_compute(data, 10, hash);
-println("SHA-256 Engine: ONLINE");
+    unsigned char data[] = "SentinelOS";
+    unsigned char hash[32];
+    sha256_compute(data, 10, hash);
+    println("SHA-256 Engine: ONLINE");
+    // inside kernel_main after sha256:
+    scheduler_init();
+    println("Process Scheduler: ONLINE");
+
+    int pid1 = create_process(0x200000, 1001);
+    int pid2 = create_process(0x300000, 9999);
     // test allocation
     unsigned int page = allocate_page();
     println("First free page allocated!");
