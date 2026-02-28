@@ -125,7 +125,7 @@ void draw_main_screen()
     // Scan lines effect - alternating dark lines
     int i;
     for(i = 0; i < 200; i += 2)
-        draw_line(0, i, 320, i, COLOR_SCAN_LINE);
+        draw_line(0, i, 320, i, COLOR_SPACE_BLACK);
 
     // Top header bar
     draw_rect(0, 0, 320, 12, COLOR_PANEL_BG);
