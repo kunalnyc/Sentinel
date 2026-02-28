@@ -3,11 +3,12 @@
 // Actual definition
 unsigned int timer_ticks = 0;
 
-// Write byte to hardware port
+// Write to port
 static void port_write(unsigned short port, unsigned char data)
 {
     __asm__ volatile("outb %0, %1" : : "a"(data), "Nd"(port));
 }
+
 
 void timer_handler()
 {
@@ -26,15 +27,35 @@ unsigned int timer_get_seconds()
 
 void timer_init()
 {
-    // Calculate divisor for 100Hz
+    // Initialize PIC first
+    port_write(0x20, 0x11);
+    port_write(0xA0, 0x11);
+    port_write(0x21, 0x20);
+    port_write(0xA1, 0x28);
+    port_write(0x21, 0x04);
+    port_write(0xA1, 0x02);
+    port_write(0x21, 0x01);
+    port_write(0xA1, 0x01);
+    port_write(0x21, 0x00);
+    port_write(0xA1, 0x00);
+
+    // Set PIT frequency
     unsigned int divisor = 1193180 / PIT_FREQUENCY;
-
-    // Send command to PIT
     port_write(PIT_COMMAND, 0x36);
-
-    // Send divisor low byte first then high byte
     port_write(PIT_CHANNEL0, divisor & 0xFF);
     port_write(PIT_CHANNEL0, (divisor >> 8) & 0xFF);
 
+    // Register timer handler in IDT
+    extern void idt_set_entry(int n, unsigned int handler);
+    idt_set_entry(32, (unsigned int)timer_handler);
+
+    // Enable interrupts
+    __asm__ volatile("sti");
+
     timer_ticks = 0;
+}
+void timer_wait(unsigned int ticks)
+{
+    unsigned int start = timer_ticks;
+    while(timer_ticks < start + ticks) {}
 }

@@ -115,3 +115,44 @@ void draw_line(int x1, int y1, int x2, int y2, unsigned char color)
         draw_pixel(x, y, color);
     }
 }
+
+void set_palette_color(unsigned char index, 
+                       unsigned char r, 
+                       unsigned char g, 
+                       unsigned char b)
+{
+    port_write(0x3C8, index);      // tell VGA which color
+    port_write(0x3C9, r >> 2);     // red   (6-bit)
+    port_write(0x3C9, g >> 2);     // green (6-bit)
+    port_write(0x3C9, b >> 2);     // blue  (6-bit)
+}
+
+void init_forerunner_palette()
+{
+    // Pure black
+    set_palette_color(0,  0,   0,   0);
+    // Deep space black (slight blue tint)
+    set_palette_color(1,  5,   5,   20);
+    // Forerunner gold
+    set_palette_color(2,  255, 200, 50);
+    // Hard light blue
+    set_palette_color(3,  0,   150, 255);
+    // Neon cyan
+    set_palette_color(4,  0,   255, 220);
+    // Verified green
+    set_palette_color(5,  0,   255, 100);
+    // Alert red
+    set_palette_color(6,  255, 30,  30);
+    // Deep blue panel
+    set_palette_color(7,  10,  15,  40);
+    // Pure white
+    set_palette_color(8,  255, 255, 255);
+    // Silver
+    set_palette_color(9,  180, 180, 200);
+    // Dim gold
+    set_palette_color(10, 150, 120, 30);
+    // Panel background
+    set_palette_color(11, 8,   12,  35);
+    // Scan line color
+    set_palette_color(12, 3,   5,   15);
+}

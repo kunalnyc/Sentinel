@@ -15,4 +15,6 @@ void timer_handler();
 unsigned int timer_get_ticks();
 unsigned int timer_get_seconds();
 
+void timer_wait(unsigned int seconds);
+
 #endif
