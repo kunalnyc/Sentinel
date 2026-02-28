@@ -203,18 +203,40 @@ void draw_main_screen()
 }
 void kernel_main(void)
 {
-    // Initialize systems FIRST
-    idt_init();
-    memory_init();
-    timer_init();      // timer before animation!
-    keyboard_init();
+    // VGA text mode - direct write
+    char *video = (char *)0xB8000;
+    
+    // Clear screen
+    int i;
+    for(i = 0; i < 80*25*2; i+=2)
+    {
+        video[i]   = ' ';
+        video[i+1] = 0x0F;
+    }
 
-    // THEN switch to graphics
-    graphics_init();
-
-    // Now animation will work properly
-    //boot_animation();
-    draw_main_screen();
+    // Write boot message
+    char *msg1 = "SENTINELOS 64-BIT KERNEL RUNNING";
+    char *msg2 = "TRUST REGISTRY: INITIALIZING...";
+    char *msg3 = "VERIFICATION GATE: ACTIVE";
+    
+    int j;
+    for(j = 0; msg1[j]; j++)
+    {
+        video[j*2]   = msg1[j];
+        video[j*2+1] = 0x0F;
+    }
+    
+    for(j = 0; msg2[j]; j++)
+    {
+        video[160 + j*2]   = msg2[j];
+        video[160 + j*2+1] = 0x0A; // green
+    }
+    
+    for(j = 0; msg3[j]; j++)
+    {
+        video[320 + j*2]   = msg3[j];
+        video[320 + j*2+1] = 0x0E; // yellow
+    }
 
     while(1) {}
 }
