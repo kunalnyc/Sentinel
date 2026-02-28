@@ -8,7 +8,7 @@
 #include "keyboard.h"
 #include "timer.h"
 #include "graphics.h"
-
+#include "font.h"
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -47,27 +47,30 @@ void clear_screen() {
 
 void kernel_main(void)
 {
-    // Switch to graphics mode
-    graphics_init();
-
-    // Clear screen to black
+   graphics_init();
     clear_screen_graphics(COLOR_BLACK);
 
-    // Draw Sentinel boot screen
-    // Gold bar at top
+    // Gold bars top and bottom
     draw_rect(0, 0, 320, 10, COLOR_GOLD);
-
-    // Gold bar at bottom
     draw_rect(0, 190, 320, 10, COLOR_GOLD);
 
-    // Draw centered rectangle - main panel
+    // Main panel
     draw_rect(60, 30, 200, 140, COLOR_DARKGRAY);
 
-    // Draw gold border around panel
+    // Gold border
     draw_line(60, 30, 260, 30, COLOR_GOLD);
     draw_line(60, 170, 260, 170, COLOR_GOLD);
     draw_line(60, 30, 60, 170, COLOR_GOLD);
     draw_line(260, 30, 260, 170, COLOR_GOLD);
+
+    // Draw text on screen!
+    draw_string(80, 40, "SENTINELOS", COLOR_GOLD);
+    draw_string(80, 55, "VERSION 0.1", COLOR_WHITE);
+    draw_string(80, 80, "TRUST REGISTRY ONLINE", COLOR_GREEN);
+    draw_string(80, 95, "MEMORY MANAGER ONLINE", COLOR_GREEN);
+    draw_string(80, 110, "SHA-256 ENGINE ONLINE", COLOR_GREEN);
+    draw_string(80, 125, "VERIFICATION GATE ACTIVE", COLOR_GREEN);
+    draw_string(70, 155, "ALL SYSTEMS OPERATIONAL", COLOR_GOLD);
 
     while(1) {}
 }
