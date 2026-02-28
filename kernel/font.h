@@ -10,6 +10,6 @@ extern unsigned char font_data[128][8];
 
 // Function signatures
 void draw_char(int x, int y, char c, unsigned char color);
-void draw_string(int x, int y, char *str, unsigned char color);
+void draw_string(int x, int y, const char *str, unsigned char color);
 
 #endif

@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "graphics.h"
 #include "font.h"
+#include <stdint.h>
 // Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
@@ -76,43 +77,44 @@ void draw_sentinel_logo(int cx, int cy)
     draw_line(cx+20, cy+10, cx+30, cy+10, COLOR_GOLD);
 }
 
-void boot_animation()
-{
+typedef unsigned int uint32_t;
+
+// Improved centering helper
+void draw_string_centered(int y, const char* str, uint32_t color) {
+    int len = 0;
+    while(str[len] != '\0') len++;
+    int x = (320 - (len * 8)) / 2; // Centers for 320px width
+    draw_string(x, y, (char*)str, (unsigned char)color);
+}
+
+void boot_animation() {
     clear_screen_graphics(COLOR_BLACK);
+    
+    // 1. THE LOGO (A simple, clean bracket design)
+    // Instead of a diamond, let's use a "Secure Bracket"
+    draw_string_centered(60,  "[ S E N T I N E L ]", COLOR_GOLD);
+    draw_string_centered(70,  "___________________", COLOR_GOLD);
+    timer_wait(200);
 
-    // Draw logo piece by piece with delays
-    int cx = 160;
-    int cy = 80;
+    // 2. SYSTEM ARCHIVE INITIALIZATION
+    // This looks professional because it shows the user the OS is "working"
+    draw_string(40, 100, "CORE.....[ OK ]", COLOR_WHITE); timer_wait(60);
+    draw_string(40, 110, "MEM......[ OK ]", COLOR_WHITE); timer_wait(60);
+    draw_string(40, 120, "CRYPTO...[ OK ]", COLOR_GOLD);  timer_wait(100);
+    
+    // 3. THE DECODING HEARTBEAT
+    // A little animation to show the "million year" update logic
+    draw_string(40, 140, "VERIFYING SECTORS:", COLOR_WHITE);
+    for(int i = 0; i < 5; i++) {
+        draw_string(180 + (i*10), 140, ".", COLOR_GOLD);
+        timer_wait(80);
+    }
 
-    // Outer diamond draws itself
-    draw_line(cx, cy-40, cx+30, cy, COLOR_GOLD);
-    timer_wait(50);
-    draw_line(cx+30, cy, cx, cy+40, COLOR_GOLD);
-    timer_wait(50);
-    draw_line(cx, cy+40, cx-30, cy, COLOR_GOLD);
-    timer_wait(50);
-    draw_line(cx-30, cy, cx, cy-40, COLOR_GOLD);
-    timer_wait(50);
-
-    // Inner diamond
-    draw_line(cx,    cy-20, cx+15, cy,    COLOR_WHITE);
-    draw_line(cx+15, cy,    cx,    cy+20, COLOR_WHITE);
-    draw_line(cx,    cy+20, cx-15, cy,    COLOR_WHITE);
-    draw_line(cx-15, cy,    cx,    cy-20, COLOR_WHITE);
-    timer_wait(50);
-
-    // Center cross
-    draw_line(cx-30, cy, cx+30, cy, COLOR_GOLD);
-    draw_line(cx, cy-40, cx, cy+40, COLOR_GOLD);
-    timer_wait(50);
-
-    // Title appears
-    draw_string(100, 140, "SENTINELOS", COLOR_GOLD);
-    timer_wait(50);
-    draw_string(75, 155, "TRUST NOTHING.", COLOR_WHITE);
-    timer_wait(50);
-    draw_string(75, 165, "VERIFY EVERYTHING.", COLOR_WHITE);
-    timer_wait(50);
+    // 4. THE ULTIMATUM
+    // Large gap, then the motto at the bottom
+    draw_string_centered(175, "TRUST NOTHING.", COLOR_WHITE);
+    timer_wait(100);
+    draw_string_centered(185, "VERIFY EVERYTHING.", COLOR_WHITE);
 }
 
 void draw_main_screen()
@@ -211,7 +213,7 @@ void kernel_main(void)
     graphics_init();
 
     // Now animation will work properly
-   // boot_animation();
+    //boot_animation();
     draw_main_screen();
 
     while(1) {}

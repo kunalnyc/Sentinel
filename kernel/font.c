@@ -64,7 +64,7 @@ void draw_char(int x, int y, char c, unsigned char color)
     }
 }
 
-void draw_string(int x, int y, char *str, unsigned char color)
+void draw_string(int x, int y, const char *str, unsigned char color)
 {
     int i = 0;
     while(str[i] != '\0')

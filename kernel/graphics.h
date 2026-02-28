@@ -7,6 +7,7 @@
 #define VGA_MEMORY   0xA0000
 
 // Basic colors (Mode 13h palette)
+
 #define COLOR_BLUE     1
 #define COLOR_GREEN    2
 #define COLOR_CYAN     3
