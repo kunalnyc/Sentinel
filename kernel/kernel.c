@@ -203,7 +203,6 @@ void draw_main_screen()
 }
 void kernel_main(void)
 {
-    // VGA text mode - direct write
     char *video = (char *)0xB8000;
     
     // Clear screen
@@ -214,28 +213,42 @@ void kernel_main(void)
         video[i+1] = 0x0F;
     }
 
-    // Write boot message
-    char *msg1 = "SENTINELOS 64-BIT KERNEL RUNNING";
-    char *msg2 = "TRUST REGISTRY: INITIALIZING...";
-    char *msg3 = "VERIFICATION GATE: ACTIVE";
-    
-    int j;
-    for(j = 0; msg1[j]; j++)
+    // Boot messages
+    char *msgs[] = {
+        "SENTINELOS 64-BIT - BOOTING...",
+        "INTERRUPT DESCRIPTOR TABLE: ONLINE",
+        "MEMORY MANAGER: ONLINE",
+        "TRUST REGISTRY: ONLINE",
+        "SHA-256 ENGINE: ONLINE",
+        "PROCESS SCHEDULER: ONLINE",
+        "KEYBOARD DRIVER: ONLINE",
+        "TIMER DRIVER: ONLINE",
+        "VERIFICATION GATE: ACTIVE",
+        "ALL SYSTEMS OPERATIONAL",
+        0
+    };
+
+    unsigned char colors[] = {
+        0x0F, // white
+        0x0F, // white
+        0x0F, // white
+        0x0A, // green
+        0x0A, // green
+        0x0A, // green
+        0x0A, // green
+        0x0A, // green
+        0x0E, // yellow
+        0x0E, // yellow
+    };
+
+    int row, j;
+    for(row = 0; msgs[row] != 0; row++)
     {
-        video[j*2]   = msg1[j];
-        video[j*2+1] = 0x0F;
-    }
-    
-    for(j = 0; msg2[j]; j++)
-    {
-        video[160 + j*2]   = msg2[j];
-        video[160 + j*2+1] = 0x0A; // green
-    }
-    
-    for(j = 0; msg3[j]; j++)
-    {
-        video[320 + j*2]   = msg3[j];
-        video[320 + j*2+1] = 0x0E; // yellow
+        for(j = 0; msgs[row][j]; j++)
+        {
+            video[row*160 + j*2]   = msgs[row][j];
+            video[row*160 + j*2+1] = colors[row];
+        }
     }
 
     while(1) {}
