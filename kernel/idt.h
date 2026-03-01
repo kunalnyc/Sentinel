@@ -13,7 +13,7 @@ struct IDTEntry {
 // IDT pointer - tells CPU where the IDT is
 struct IDTPointer {
     unsigned short limit;   // size of IDT - 1
-    unsigned int   base;    // address of IDT
+    unsigned long long base;  // 64-bit pointer!
 } __attribute__((packed));
 
 // 256 possible interrupts
@@ -22,6 +22,6 @@ extern struct IDTPointer idt_ptr;
 
 // Function signatures
 void idt_init();
-void idt_set_entry(int n, unsigned int handler);
+void idt_set_entry(int n, unsigned long long handler);
 
 #endif

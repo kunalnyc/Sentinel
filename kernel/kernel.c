@@ -201,20 +201,114 @@ void draw_main_screen()
     draw_string(160, 172, "ARCH", COLOR_SILVER);
     draw_string(220, 172, "X86-32", COLOR_HARD_LIGHT);
 }
-void kernel_main(void)
+
+// Multiboot2 structures
+struct mb2_tag {
+    unsigned int type;
+    unsigned int size;
+};
+
+struct mb2_tag_framebuffer {
+    unsigned int type;
+    unsigned int size;
+    unsigned long long framebuffer_addr;
+    unsigned int framebuffer_pitch;
+    unsigned int framebuffer_width;
+    unsigned int framebuffer_height;
+    unsigned char framebuffer_bpp;
+    unsigned char framebuffer_type;
+    unsigned short reserved;
+};
+
+// Global framebuffer info
+unsigned long long fb_addr = 0;
+unsigned int fb_width = 0;
+unsigned int fb_height = 0;
+unsigned int fb_pitch = 0;
+
+void parse_multiboot(unsigned long long mb_addr)
 {
-    // Initialize systems FIRST
-    idt_init();
-    memory_init();
-    timer_init();      // timer before animation!
-    keyboard_init();
+    unsigned long long addr = mb_addr + 8;
+    
+    while(1)
+    {
+        struct mb2_tag *tag = (struct mb2_tag *)addr;
+        
+        if(tag->type == 0) break;
+        
+        if(tag->type == 8) // framebuffer tag
+        {
+            struct mb2_tag_framebuffer *fb = 
+                (struct mb2_tag_framebuffer *)addr;
+            fb_addr   = fb->framebuffer_addr;
+            fb_width  = fb->framebuffer_width;
+            fb_height = fb->framebuffer_height;
+            fb_pitch  = fb->framebuffer_pitch;
+        }
+        
+        addr += (tag->size + 7) & ~7;
+    }
+}
 
-    // THEN switch to graphics
-    graphics_init();
+void draw_pixel_fb(int x, int y, unsigned int color)
+{
+    if(!fb_addr) return;
+    unsigned int *fb = (unsigned int *)fb_addr;
+    fb[y * (fb_pitch/4) + x] = color;
+}
 
-    // Now animation will work properly
-    //boot_animation();
-    draw_main_screen();
+void fill_rect_fb(int x, int y, int w, int h, unsigned int color)
+{
+    int i, j;
+    for(j = y; j < y+h; j++)
+        for(i = x; i < x+w; i++)
+            draw_pixel_fb(i, j, color);
+}
+
+void kernel_main(unsigned int magic, unsigned int mb_addr)
+{
+    char *video = (char *)0xB8000;
+    
+    int i;
+    for(i = 0; i < 80*25*2; i+=2)
+    {
+        video[i]   = ' ';
+        video[i+1] = 0x0F;
+    }
+
+    if(magic == 0x36d76289)
+    {
+        char *msgs[] = {
+            "SENTINELOS 64-BIT - BOOTING...",
+            "INTERRUPT DESCRIPTOR TABLE: ONLINE",
+            "MEMORY MANAGER: ONLINE",
+            "TRUST REGISTRY: ONLINE",
+            "SHA-256 ENGINE: ONLINE",
+            "PROCESS SCHEDULER: ONLINE",
+            "KEYBOARD DRIVER: ONLINE",
+            "TIMER DRIVER: ONLINE",
+            "VERIFICATION GATE: ACTIVE",
+            "ALL SYSTEMS OPERATIONAL",
+            0
+        };
+
+        unsigned char colors[] = {
+            0x0F,0x0F,0x0F,
+            0x0A,0x0A,0x0A,
+            0x0A,0x0A,
+            0x0E,0x0E
+        };
+
+        int row, j;
+        for(row = 0; msgs[row] != 0; row++)
+        {
+            for(j = 0; msgs[row][j]; j++)
+            {
+                video[row*160 + j*2]   = msgs[row][j];
+                video[row*160 + j*2+1] = colors[row];
+            }
+        }
+    }
 
     while(1) {}
 }

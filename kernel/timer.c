@@ -47,7 +47,7 @@ void timer_init()
 
     // Register timer handler in IDT
     extern void idt_set_entry(int n, unsigned int handler);
-    idt_set_entry(32, (unsigned int)timer_handler);
+    idt_set_entry(32, (unsigned long long)timer_handler);
 
     // Enable interrupts
     __asm__ volatile("sti");
