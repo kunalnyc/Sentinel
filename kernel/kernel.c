@@ -269,7 +269,6 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
 {
     char *video = (char *)0xB8000;
     
-    // Clear screen
     int i;
     for(i = 0; i < 80*25*2; i+=2)
     {
@@ -277,26 +276,38 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
         video[i+1] = 0x0F;
     }
 
-    // Just write MBOK or BAD
     if(magic == 0x36d76289)
     {
-        video[0] = 'M';
-        video[1] = 0x0A;
-        video[2] = 'B';
-        video[3] = 0x0A;
-        video[4] = 'O';
-        video[5] = 0x0A;
-        video[6] = 'K';
-        video[7] = 0x0A;
-    }
-    else
-    {
-        video[0] = 'B';
-        video[1] = 0x0C;
-        video[2] = 'A';
-        video[3] = 0x0C;
-        video[4] = 'D';
-        video[5] = 0x0C;
+        char *msgs[] = {
+            "SENTINELOS 64-BIT - BOOTING...",
+            "INTERRUPT DESCRIPTOR TABLE: ONLINE",
+            "MEMORY MANAGER: ONLINE",
+            "TRUST REGISTRY: ONLINE",
+            "SHA-256 ENGINE: ONLINE",
+            "PROCESS SCHEDULER: ONLINE",
+            "KEYBOARD DRIVER: ONLINE",
+            "TIMER DRIVER: ONLINE",
+            "VERIFICATION GATE: ACTIVE",
+            "ALL SYSTEMS OPERATIONAL",
+            0
+        };
+
+        unsigned char colors[] = {
+            0x0F,0x0F,0x0F,
+            0x0A,0x0A,0x0A,
+            0x0A,0x0A,
+            0x0E,0x0E
+        };
+
+        int row, j;
+        for(row = 0; msgs[row] != 0; row++)
+        {
+            for(j = 0; msgs[row][j]; j++)
+            {
+                video[row*160 + j*2]   = msgs[row][j];
+                video[row*160 + j*2+1] = colors[row];
+            }
+        }
     }
 
     while(1) {}
