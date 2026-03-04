@@ -37,7 +37,7 @@ int create_process(unsigned int entry_point, unsigned int token)
 
     if(!trusted)
     {
-        println("SECURITY: Process rejected - unknown token!");
+       // Silent rejection - no println in 64-bit kernel println("SECURITY: Process rejected - unknown token!");
         return -1; // REJECTED
     }
 

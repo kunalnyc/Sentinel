@@ -1,27 +1,25 @@
 #ifndef IDT_H
 #define IDT_H
 
-// One entry in the IDT table
+#include <stdint.h>
+
+// IDT entry structure
 struct IDTEntry {
-    unsigned short base_low;    // lower 16 bits of handler address
-    unsigned short selector;    // kernel code segment = 0x08
-    unsigned char  zero;        // always 0
-    unsigned char  type_attr;   // type and attributes
-    unsigned short base_high;   // upper 16 bits of handler address
+    uint16_t base_low;
+    uint16_t selector;
+    uint8_t always0;
+    uint8_t flags;
+    uint16_t base_high;
 } __attribute__((packed));
 
-// IDT pointer - tells CPU where the IDT is
+// IDT pointer structure for lidt instruction
 struct IDTPointer {
-    unsigned short limit;   // size of IDT - 1
-    unsigned long long base;  // 64-bit pointer!
+    uint16_t limit;
+    uint32_t base;
 } __attribute__((packed));
 
-// 256 possible interrupts
-extern struct IDTEntry idt[256];
-extern struct IDTPointer idt_ptr;
-
-// Function signatures
-void idt_init();
-void idt_set_entry(int n, unsigned long long handler);
+// Function declarations
+void idt_set_entry(int index, uint32_t base, uint16_t selector, uint8_t flags);
+void idt_init(void);
 
 #endif

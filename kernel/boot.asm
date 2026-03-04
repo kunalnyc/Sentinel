@@ -8,52 +8,50 @@ mb_start:
     dd 0xE85250D6
     dd 0
     dd mb_end - mb_start
-    dd -(0xE85250D6 + 0 + (mb_end - mb_start))
+    dd 0x100000000 - (0xE85250D6 + 0 + (mb_end - mb_start))
     align 8
     dw 0
     dw 0
     dd 8
 mb_end:
 
-section .bss
-align 16
-resb 16384
-stack_top:
-
 section .text
 global _start
 _start:
-    mov esp, stack_top
-
-    ; Save magic and mb_ptr before anything
+    mov esp, 0x90000
     mov [saved_magic], eax
     mov [saved_mbptr], ebx
 
     ; Clear page tables
     mov edi, 0x1000
     xor eax, eax
-    mov ecx, 0x3000 / 4
+    mov ecx, 0x5000 / 4
     rep stosd
 
-    ; PML4
+    ; PML4 at 0x1000
+    ; Entry 0 → PDPT at 0x2000 (first 512GB)
     mov dword [0x1000], 0x2003
     mov dword [0x1004], 0
 
-    ; PDPT
-    mov dword [0x2000], 0x3003
+    ; PDPT at 0x2000
+    ; Map all 4 entries = 4GB total using 1GB pages
+    ; 1GB page flag = 0x83 | (1<<7) = 0x83 already has PS bit
+    ; For 1GB pages in PDPT: bit 7 must be set
+    mov dword [0x2000], 0x0000083  ; 0GB-1GB
     mov dword [0x2004], 0
+    mov dword [0x2008], 0x40000083 ; 1GB-2GB
+    mov dword [0x200C], 0
+    mov dword [0x2010], 0x80000083 ; 2GB-3GB
+    mov dword [0x2014], 0
+    mov dword [0x2018], 0xC0000083 ; 3GB-4GB (covers 0xE0000000!)
+    mov dword [0x201C], 0
 
-    ; PD
-    mov dword [0x3000], 0x0083
-    mov dword [0x3004], 0
-
-    ; Load CR3
     mov eax, 0x1000
     mov cr3, eax
 
-    ; Enable PAE
+    ; Enable PAE + PSE
     mov eax, cr4
-    or eax, 0x20
+    or eax, 0x30
     mov cr4, eax
 
     ; Enable Long Mode
@@ -95,7 +93,6 @@ lmode:
     mov rsp, 0x90000
     xor rbp, rbp
 
-    ; Load arguments for kernel_main
     xor rdi, rdi
     xor rsi, rsi
     mov edi, [rel saved_magic]
