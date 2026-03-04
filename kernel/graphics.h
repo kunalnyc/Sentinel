@@ -41,5 +41,5 @@ void clear_screen_graphics(unsigned char color);
 void bochs_set_mode(unsigned short width, unsigned short height, unsigned short bpp);
 void set_palette_color(unsigned char index, unsigned char r, unsigned char g, unsigned char b);
 void init_forerunner_palette();
-
+unsigned short vbe_read_id(void);
 #endif

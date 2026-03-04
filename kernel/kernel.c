@@ -267,48 +267,19 @@ void fill_rect_fb(int x, int y, int w, int h, unsigned int color)
 
 void kernel_main(unsigned int magic, unsigned int mb_addr)
 {
-    char *video = (char *)0xB8000;
-    
-    int i;
-    for(i = 0; i < 80*25*2; i+=2)
-    {
-        video[i]   = ' ';
-        video[i+1] = 0x0F;
-    }
-
-    if(magic == 0x36d76289)
-    {
-        char *msgs[] = {
-            "SENTINELOS 64-BIT - BOOTING...",
-            "INTERRUPT DESCRIPTOR TABLE: ONLINE",
-            "MEMORY MANAGER: ONLINE",
-            "TRUST REGISTRY: ONLINE",
-            "SHA-256 ENGINE: ONLINE",
-            "PROCESS SCHEDULER: ONLINE",
-            "KEYBOARD DRIVER: ONLINE",
-            "TIMER DRIVER: ONLINE",
-            "VERIFICATION GATE: ACTIVE",
-            "ALL SYSTEMS OPERATIONAL",
-            0
-        };
-
-        unsigned char colors[] = {
-            0x0F,0x0F,0x0F,
-            0x0A,0x0A,0x0A,
-            0x0A,0x0A,
-            0x0E,0x0E
-        };
-
-        int row, j;
-        for(row = 0; msgs[row] != 0; row++)
-        {
-            for(j = 0; msgs[row][j]; j++)
-            {
-                video[row*160 + j*2]   = msgs[row][j];
-                video[row*160 + j*2+1] = colors[row];
-            }
-        }
-    }
-s
+    graphics_init();
+    init_forerunner_palette();
+    clear_screen_graphics(COLOR_SPACE_BLACK);
+    draw_sentinel_logo(240, 90);
+    draw_string(10, 20, "SENTINELOS 64-BIT", COLOR_FORERUNNER_GOLD);
+    draw_string(10, 35, "TRUST REGISTRY",    COLOR_SILVER);
+    draw_string(150, 35, "ONLINE",           COLOR_VERIFIED_GREEN);
+    draw_string(10, 45, "SHA-256 ENGINE",    COLOR_SILVER);
+    draw_string(150, 45, "ONLINE",           COLOR_VERIFIED_GREEN);
+    draw_string(10, 55, "MEMORY GUARD",      COLOR_SILVER);
+    draw_string(150, 55, "ONLINE",           COLOR_VERIFIED_GREEN);
+    draw_string(10, 65, "VERIFY GATE",       COLOR_SILVER);
+    draw_string(150, 65, "ACTIVE",           COLOR_FORERUNNER_GOLD);
+    draw_string(10, 175, "ALL SYSTEMS OPERATIONAL", COLOR_VERIFIED_GREEN);
     while(1) {}
 }

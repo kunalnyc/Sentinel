@@ -40,7 +40,13 @@ static unsigned char port_read(unsigned short port)
     __asm__ volatile("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
-
+unsigned short vbe_read_id()
+{
+    port_write_word(VBE_DISPI_IOPORT_INDEX, 0);
+    unsigned short result;
+    __asm__ volatile("inw %1, %0" : "=a"(result) : "Nd"((unsigned short)VBE_DISPI_IOPORT_DATA));
+    return result;
+}
 static void vbe_write(unsigned short index, unsigned short data)
 {
     port_write_word(VBE_DISPI_IOPORT_INDEX, index);
