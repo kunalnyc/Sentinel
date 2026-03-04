@@ -309,6 +309,6 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
             }
         }
     }
-
+s
     while(1) {}
 }
