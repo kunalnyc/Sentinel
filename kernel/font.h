@@ -1,15 +1,17 @@
 #ifndef FONT_H
 #define FONT_H
 
-// Each character is 8x8 pixels = 8 bytes
-#define FONT_WIDTH  8
+#include <stdint.h>
+
+#define FONT_WIDTH 8
 #define FONT_HEIGHT 8
 
-// Font data - 128 characters x 8 bytes each
-extern unsigned char font_data[128][8];
+// Match the graphics.h signature
+void draw_char(char c, int x, int y, uint32_t color, uint32_t bgcolor);
+void draw_string(int x, int y, const char *str, uint32_t color);
+void draw_string_with_bg(int x, int y, const char *str, uint32_t color, uint32_t bgcolor);
 
-// Function signatures
-void draw_char(int x, int y, char c, unsigned char color);
-void draw_string(int x, int y, const char *str, unsigned char color);
+// Font data
+extern uint8_t font_8x8_basic[256][8];
 
 #endif

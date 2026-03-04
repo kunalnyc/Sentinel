@@ -1,20 +1,23 @@
+#include <stdint.h>
+#include <stddef.h>  // for uintptr_t
 #include "idt.h"
 
-void idt_set_entry(int n, unsigned long long handler)
-{
-    idt[n].base_low  = handler & 0xFFFF;
-    idt[n].base_high = (handler >> 16) & 0xFFFF;
-    idt[n].selector  = 0x08;
-    idt[n].zero      = 0;
-    idt[n].type_attr = 0x8E;
+// Define the global IDT table
+struct IDTEntry idt[256];
+struct IDTPointer idt_ptr;
+
+void idt_set_entry(int index, uint32_t base, uint16_t selector, uint8_t flags) {
+    idt[index].base_low = base & 0xFFFF;
+    idt[index].base_high = (base >> 16) & 0xFFFF;
+    idt[index].selector = selector;
+    idt[index].always0 = 0;
+    idt[index].flags = flags;
 }
 
-void idt_init()
-{
-    idt_ptr.limit = (sizeof(struct IDTEntry) * 256) - 1;
-   // TO:
-    idt_ptr.base = (unsigned long long)&idt;
-
-    // Load IDT into CPU
-    __asm__ volatile("lidt %0" : : "m"(idt_ptr));
+void idt_init(void) {
+    idt_ptr.limit = sizeof(struct IDTEntry) * 256 - 1;
+    idt_ptr.base = (uint32_t)(uintptr_t)&idt;
+    
+    // Load IDT
+    __asm__ volatile ("lidt (%0)" : : "r" (&idt_ptr));
 }
