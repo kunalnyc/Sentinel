@@ -9,7 +9,7 @@
 #include "font.h"
 #include "io.h"
 #include <stdint.h>
-
+#include "shell.h"
 // Multiboot2 structures
 struct mb2_tag {
     uint32_t type;
@@ -359,10 +359,13 @@ void kernel_main(unsigned int magic, unsigned int mb_addr) {
             draw_main_screen();
         }
     }
-    
+      // Launch shell
+    //  shell_init();
     debug_print("Entering main loop\n");
-    
+  
     while(1) {
         __asm__ volatile("hlt");
+        //  char c = keyboard_getchar();
+        // if(c) shell_handle_key(c);
     }
 }
