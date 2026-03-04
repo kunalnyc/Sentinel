@@ -19,48 +19,39 @@ section .text
 global _start
 _start:
     mov esp, 0x90000
-
-    ; Save magic and mb_ptr
     mov [saved_magic], eax
     mov [saved_mbptr], ebx
-
-    ; We need to switch to real mode to call BIOS for VESA
-    ; But we're already in protected mode from GRUB
-    ; So instead - write VBE mode info to known address
-    ; and let kernel use it
 
     ; Clear page tables
     mov edi, 0x1000
     xor eax, eax
-    mov ecx, 0x4000 / 4
+    mov ecx, 0x5000 / 4
     rep stosd
 
-    ; PML4 at 0x1000 - map first 4GB
+    ; PML4 at 0x1000
+    ; Entry 0 → PDPT at 0x2000 (first 512GB)
     mov dword [0x1000], 0x2003
     mov dword [0x1004], 0
 
-    ; PDPT at 0x2000 - map first 1GB
-    mov dword [0x2000], 0x3003
+    ; PDPT at 0x2000
+    ; Map all 4 entries = 4GB total using 1GB pages
+    ; 1GB page flag = 0x83 | (1<<7) = 0x83 already has PS bit
+    ; For 1GB pages in PDPT: bit 7 must be set
+    mov dword [0x2000], 0x0000083  ; 0GB-1GB
     mov dword [0x2004], 0
+    mov dword [0x2008], 0x40000083 ; 1GB-2GB
+    mov dword [0x200C], 0
+    mov dword [0x2010], 0x80000083 ; 2GB-3GB
+    mov dword [0x2014], 0
+    mov dword [0x2018], 0xC0000083 ; 3GB-4GB (covers 0xE0000000!)
+    mov dword [0x201C], 0
 
-    ; PD at 0x3000 - map first 512MB with 2MB pages
-    mov eax, 0x0083
-    mov ecx, 256
-    mov edi, 0x3000
-.map_pd:
-    mov dword [edi], eax
-    mov dword [edi+4], 0
-    add eax, 0x200000
-    add edi, 8
-    loop .map_pd
-
-    ; Load PML4
     mov eax, 0x1000
     mov cr3, eax
 
-    ; Enable PAE
+    ; Enable PAE + PSE
     mov eax, cr4
-    or eax, 0x20
+    or eax, 0x30
     mov cr4, eax
 
     ; Enable Long Mode

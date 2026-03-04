@@ -1,3 +1,5 @@
+// Sentinel kernel main file
+// Entry point - first code the CPU runs after bootloader
 #include "../security/trust.h"
 #include "../security/sha256.h"
 #include "idt.h"
@@ -7,235 +9,306 @@
 #include "timer.h"
 #include "graphics.h"
 #include "font.h"
-// IDT definitions
+#include <stdint.h>
+// Actual definitions live here
 struct IDTEntry idt[256];
 struct IDTPointer idt_ptr;
 
-// Multiboot2 structures
-struct MB2Tag {
-    unsigned int type;
-    unsigned int size;
-};
+int cursor_row = 0;
+int cursor_col = 0;
 
-struct MB2Framebuffer {
-    unsigned int type;
-    unsigned int size;
-    unsigned long long addr;
-    unsigned int pitch;
-    unsigned int width;
-    unsigned int height;
-    unsigned char bpp;
-    unsigned char fb_type;
-    unsigned short reserved;
-};
-
-struct MB2Header {
-    unsigned int total_size;
-    unsigned int reserved;
-};
-
-// Global framebuffer
-unsigned long long fb_addr  = 0;
-unsigned int fb_width  = 0;
-unsigned int fb_height = 0;
-unsigned int fb_pitch  = 0;
-
-// Parse multiboot2 info
-void parse_multiboot(unsigned int mb_addr)
+void print(char *str)
 {
-    unsigned long long addr = (unsigned long long)mb_addr;
-    unsigned int total = ((struct MB2Header*)addr)->total_size;
-    unsigned long long end = addr + total;
-    addr += 8;
+    char *video = (char *)0xB8000;
+    int i = 0;
 
-    while(addr < end)
+    while(str[i] != '\0')
     {
-        struct MB2Tag *tag = (struct MB2Tag*)addr;
-        if(tag->type == 0) break;
+        int pos = (cursor_row * 80 + cursor_col) * 2;
+        video[pos]     = str[i];
+        video[pos + 1] = 0x0F;
+        cursor_col++;
+        i++;
+    }
+}
+void println(char *str)
+{
+    print(str);
+    cursor_row++;
+    cursor_col = 0;
+}
 
-        if(tag->type == 8)
-        {
-            struct MB2Framebuffer *fb = (struct MB2Framebuffer*)addr;
-            fb_addr   = fb->addr;
-            fb_width  = fb->width;
-            fb_height = fb->height;
-            fb_pitch  = fb->pitch;
-        }
-        addr += (tag->size + 7) & ~7;
+void clear_screen() {
+    char *video = (char *)0xB8000; // VGA video memory starts at 0xB8000
+    for (int i = 0; i < 80 * 25; i++) {
+        video[i * 2] = ' '; // Clear character
+        video[i * 2 + 1] = 0x0F; // Attribute byte (white on black)
     }
 }
 
-// Framebuffer drawing functions
-void put_pixel(int x, int y, unsigned int color)
+
+// Forward declarations
+void println(char *str);
+void print(char *str);
+
+// Draw the Sentinel geometric logo
+void draw_sentinel_logo(int cx, int cy)
 {
-    if(!fb_addr) return;
-    if(x < 0 || x >= (int)fb_width)  return;
-    if(y < 0 || y >= (int)fb_height) return;
-    unsigned int *fb = (unsigned int*)fb_addr;
-    fb[y * (fb_pitch/4) + x] = color;
+    // Outer diamond
+    draw_line(cx,      cy-40, cx+30, cy,    COLOR_GOLD);
+    draw_line(cx+30,   cy,    cx,    cy+40, COLOR_GOLD);
+    draw_line(cx,      cy+40, cx-30, cy,    COLOR_GOLD);
+    draw_line(cx-30,   cy,    cx,    cy-40, COLOR_GOLD);
+
+    // Inner diamond
+    draw_line(cx,      cy-20, cx+15, cy,    COLOR_WHITE);
+    draw_line(cx+15,   cy,    cx,    cy+20, COLOR_WHITE);
+    draw_line(cx,      cy+20, cx-15, cy,    COLOR_WHITE);
+    draw_line(cx-15,   cy,    cx,    cy-20, COLOR_WHITE);
+
+    // Center cross
+    draw_line(cx-30, cy, cx+30, cy, COLOR_GOLD);
+    draw_line(cx, cy-40, cx, cy+40, COLOR_GOLD);
+
+    // Corner accents
+    draw_line(cx-30, cy-10, cx-20, cy-10, COLOR_GOLD);
+    draw_line(cx+20, cy-10, cx+30, cy-10, COLOR_GOLD);
+    draw_line(cx-30, cy+10, cx-20, cy+10, COLOR_GOLD);
+    draw_line(cx+20, cy+10, cx+30, cy+10, COLOR_GOLD);
 }
 
-void fill_rect(int x, int y, int w, int h, unsigned int color)
-{
-    int i, j;
-    for(j = y; j < y+h; j++)
-        for(i = x; i < x+w; i++)
-            put_pixel(i, j, color);
+typedef unsigned int uint32_t;
+
+// Improved centering helper
+void draw_string_centered(int y, const char* str, uint32_t color) {
+    int len = 0;
+    while(str[len] != '\0') len++;
+    int x = (320 - (len * 8)) / 2; // Centers for 320px width
+    draw_string(x, y, (char*)str, (unsigned char)color);
 }
 
-void draw_line_fb(int x1, int y1, int x2, int y2, unsigned int color)
-{
-    int dx = x2-x1, dy = y2-y1;
-    int steps = dx>dy ? dx : dy;
-    if(steps < 0) steps = -steps;
-    if(steps == 0) { put_pixel(x1, y1, color); return; }
-    int i;
-    for(i = 0; i <= steps; i++)
-    {
-        int x = x1 + (dx * i / steps);
-        int y = y1 + (dy * i / steps);
-        put_pixel(x, y, color);
+void boot_animation() {
+    clear_screen_graphics(COLOR_BLACK);
+    
+    // 1. THE LOGO (A simple, clean bracket design)
+    // Instead of a diamond, let's use a "Secure Bracket"
+    draw_string_centered(60,  "[ S E N T I N E L ]", COLOR_GOLD);
+    draw_string_centered(70,  "___________________", COLOR_GOLD);
+    timer_wait(200);
+
+    // 2. SYSTEM ARCHIVE INITIALIZATION
+    // This looks professional because it shows the user the OS is "working"
+    draw_string(40, 100, "CORE.....[ OK ]", COLOR_WHITE); timer_wait(60);
+    draw_string(40, 110, "MEM......[ OK ]", COLOR_WHITE); timer_wait(60);
+    draw_string(40, 120, "CRYPTO...[ OK ]", COLOR_GOLD);  timer_wait(100);
+    
+    // 3. THE DECODING HEARTBEAT
+    // A little animation to show the "million year" update logic
+    draw_string(40, 140, "VERIFYING SECTORS:", COLOR_WHITE);
+    for(int i = 0; i < 5; i++) {
+        draw_string(180 + (i*10), 140, ".", COLOR_GOLD);
+        timer_wait(80);
     }
-}
 
-// Forerunner color palette
-#define BLACK   0x00050514
-#define GOLD    0x00FFC832
-#define GREEN   0x0000FF64
-#define CYAN    0x0000FFDC
-#define WHITE   0x00FFFFFF
-#define PANEL   0x0008080F
-#define DGOLD   0x00886814
-#define RED     0x00FF1E1E
-#define SILVER  0x00B4B4C8
+    // 4. THE ULTIMATUM
+    // Large gap, then the motto at the bottom
+    draw_string_centered(175, "TRUST NOTHING.", COLOR_WHITE);
+    timer_wait(100);
+    draw_string_centered(185, "VERIFY EVERYTHING.", COLOR_WHITE);
+}
 
 void draw_main_screen()
 {
     // Deep space background
-    fill_rect(0, 0, fb_width, fb_height, BLACK);
-
-    // Scanlines
-    unsigned int i;
-    for(i = 0; i < fb_height; i += 3)
-        draw_line_fb(0, i, fb_width, i, 0x00030308);
-
-    // Top bar
-    fill_rect(0, 0, fb_width, 20, PANEL);
-    draw_line_fb(0, 20, fb_width, 20, GOLD);
-    draw_line_fb(0, 22, fb_width, 22, DGOLD);
-
-    // Bottom bar
-    fill_rect(0, fb_height-20, fb_width, 20, PANEL);
-    draw_line_fb(0, fb_height-20, fb_width, fb_height-20, GOLD);
-
-    // Left panel
-    fill_rect(10, 30, (fb_width/2)-20, fb_height-60, PANEL);
-    draw_line_fb(10, 30, (fb_width/2)-10, 30, GOLD);
-    draw_line_fb(10, fb_height-30, (fb_width/2)-10, fb_height-30, GOLD);
-    draw_line_fb(10, 30, 10, fb_height-30, GOLD);
-    draw_line_fb((fb_width/2)-10, 30, (fb_width/2)-10, fb_height-30, GOLD);
-
-    // Right panel
-    fill_rect(fb_width/2+10, 30, (fb_width/2)-20, fb_height-60, PANEL);
-    draw_line_fb(fb_width/2+10, 30, fb_width-10, 30, GOLD);
-    draw_line_fb(fb_width/2+10, fb_height-30, fb_width-10, fb_height-30, GOLD);
-    draw_line_fb(fb_width/2+10, 30, fb_width/2+10, fb_height-30, GOLD);
-    draw_line_fb(fb_width-10, 30, fb_width-10, fb_height-30, GOLD);
-
-    // Corner accents left panel
-    fill_rect(10, 30, 30, 3, GOLD);
-    fill_rect((fb_width/2)-40, 30, 30, 3, GOLD);
-    fill_rect(10, fb_height-32, 30, 3, GOLD);
-    fill_rect((fb_width/2)-40, fb_height-32, 30, 3, GOLD);
-
-    // Corner accents right panel
-    fill_rect(fb_width/2+10, 30, 30, 3, GOLD);
-    fill_rect(fb_width-40, 30, 30, 3, GOLD);
-    fill_rect(fb_width/2+10, fb_height-32, 30, 3, GOLD);
-    fill_rect(fb_width-40, fb_height-32, 30, 3, GOLD);
-
-    // Sentinel diamond logo center of right panel
-    int cx = fb_width*3/4;
-    int cy = fb_height/2 - 20;
-    draw_line_fb(cx, cy-60, cx+45, cy, GOLD);
-    draw_line_fb(cx+45, cy, cx, cy+60, GOLD);
-    draw_line_fb(cx, cy+60, cx-45, cy, GOLD);
-    draw_line_fb(cx-45, cy, cx, cy-60, GOLD);
-    draw_line_fb(cx, cy-30, cx+22, cy, CYAN);
-    draw_line_fb(cx+22, cy, cx, cy+30, CYAN);
-    draw_line_fb(cx, cy+30, cx-22, cy, CYAN);
-    draw_line_fb(cx-22, cy, cx, cy-30, CYAN);
-    draw_line_fb(cx-45, cy, cx+45, cy, GOLD);
-    draw_line_fb(cx, cy-60, cx, cy+60, GOLD);
-}
-void draw_sentinel_logo(int cx, int cy)
-{
-    // Outer diamond
-    draw_line(cx,      cy-40, cx+30, cy,    COLOR_FORERUNNER_GOLD);
-    draw_line(cx+30,   cy,    cx,    cy+40, COLOR_FORERUNNER_GOLD);
-    draw_line(cx,      cy+40, cx-30, cy,    COLOR_FORERUNNER_GOLD);
-    draw_line(cx-30,   cy,    cx,    cy-40, COLOR_FORERUNNER_GOLD);
-
-    // Inner diamond
-    draw_line(cx,      cy-20, cx+15, cy,    COLOR_NEON_CYAN);
-    draw_line(cx+15,   cy,    cx,    cy+20, COLOR_NEON_CYAN);
-    draw_line(cx,      cy+20, cx-15, cy,    COLOR_NEON_CYAN);
-    draw_line(cx-15,   cy,    cx,    cy-20, COLOR_NEON_CYAN);
-
-    // Center cross
-    draw_line(cx-30, cy, cx+30, cy, COLOR_FORERUNNER_GOLD);
-    draw_line(cx, cy-40, cx, cy+40, COLOR_FORERUNNER_GOLD);
-
-    // Corner accents
-    draw_line(cx-30, cy-10, cx-20, cy-10, COLOR_FORERUNNER_GOLD);
-    draw_line(cx+20, cy-10, cx+30, cy-10, COLOR_FORERUNNER_GOLD);
-    draw_line(cx-30, cy+10, cx-20, cy+10, COLOR_FORERUNNER_GOLD);
-    draw_line(cx+20, cy+10, cx+30, cy+10, COLOR_FORERUNNER_GOLD);
-}
-void kernel_main(unsigned int magic, unsigned int mb_addr)
-{
-    // Initialize our VGA graphics mode directly
-    // This programs VGA hardware registers for Mode 13h
-    graphics_init();
-    init_forerunner_palette();
-    
-    // Now draw our screen
     clear_screen_graphics(COLOR_SPACE_BLACK);
-    
-    // Scan lines
+
+    // Scan lines effect - alternating dark lines
     int i;
     for(i = 0; i < 200; i += 2)
-        draw_line(0, i, 320, i, COLOR_SCAN_LINE);
+        draw_line(0, i, 320, i, COLOR_SPACE_BLACK);
 
-    // Top bar
-    draw_rect(0, 0, 320, 10, COLOR_PANEL_BG);
-    draw_line(0, 10, 320, 10, COLOR_FORERUNNER_GOLD);
+    // Top header bar
+    draw_rect(0, 0, 320, 12, COLOR_PANEL_BG);
+    draw_line(0, 12, 320, 12, COLOR_FORERUNNER_GOLD);
+    draw_string(2, 2, "SENTINELOS", COLOR_FORERUNNER_GOLD);
+    draw_string(220, 2, "SECURE KERNEL V0.1", COLOR_SILVER);
 
-    // Bottom bar  
-    draw_rect(0, 190, 320, 10, COLOR_PANEL_BG);
-    draw_line(0, 190, 320, 190, COLOR_FORERUNNER_GOLD);
+    // Bottom status bar
+    draw_rect(0, 188, 320, 12, COLOR_PANEL_BG);
+    draw_line(0, 188, 320, 188, COLOR_FORERUNNER_GOLD);
+    draw_string(2, 191, "ALL SYSTEMS OPERATIONAL", COLOR_VERIFIED_GREEN);
+    draw_string(240, 191, "100HZ TIMER", COLOR_SILVER);
 
-    // Main panel
-    draw_rect(5, 15, 310, 170, COLOR_PANEL_BG);
-    draw_line(5, 15, 315, 15, COLOR_FORERUNNER_GOLD);
-    draw_line(5, 185, 315, 185, COLOR_FORERUNNER_GOLD);
-    draw_line(5, 15, 5, 185, COLOR_FORERUNNER_GOLD);
-    draw_line(315, 15, 315, 185, COLOR_FORERUNNER_GOLD);
+    // Left panel - Security Status
+    draw_rect(5, 18, 145, 165, COLOR_PANEL_BG);
+    draw_line(5,   18, 150, 18,  COLOR_FORERUNNER_GOLD);
+    draw_line(5,   183, 150, 183, COLOR_FORERUNNER_GOLD);
+    draw_line(5,   18, 5,   183, COLOR_FORERUNNER_GOLD);
+    draw_line(150, 18, 150, 183, COLOR_FORERUNNER_GOLD);
 
-    // Logo
-    draw_sentinel_logo(240, 90);
+    // Left panel title
+    draw_line(5, 28, 150, 28, COLOR_DIM_GOLD);
+    draw_string(10, 20, "SECURITY STATUS", COLOR_FORERUNNER_GOLD);
 
-    // Text using our font engine
-    draw_string(10, 20, "SENTINELOS 64-BIT", COLOR_FORERUNNER_GOLD);
-    draw_string(10, 35, "TRUST REGISTRY", COLOR_SILVER);
-    draw_string(150, 35, "ONLINE", COLOR_VERIFIED_GREEN);
-    draw_string(10, 45, "SHA-256 ENGINE", COLOR_SILVER);
-    draw_string(150, 45, "ONLINE", COLOR_VERIFIED_GREEN);
-    draw_string(10, 55, "MEMORY GUARD", COLOR_SILVER);
-    draw_string(150, 55, "ONLINE", COLOR_VERIFIED_GREEN);
-    draw_string(10, 65, "VERIFY GATE", COLOR_SILVER);
-    draw_string(150, 65, "ACTIVE", COLOR_FORERUNNER_GOLD);
-    draw_string(10, 175, "ALL SYSTEMS OPERATIONAL", COLOR_VERIFIED_GREEN);
+    // Security items
+    draw_string(10, 35,  "TRUST REGISTRY", COLOR_SILVER);
+    draw_string(10, 45,  "VERIFICATION GATE", COLOR_SILVER);
+    draw_string(10, 55,  "SHA-256 ENGINE", COLOR_SILVER);
+    draw_string(10, 65,  "MEMORY GUARD", COLOR_SILVER);
+    draw_string(10, 75,  "PROCESS SHIELD", COLOR_SILVER);
+    draw_string(10, 85,  "IDT PROTECTION", COLOR_SILVER);
+
+    // Status indicators
+    draw_string(110, 35, "ONLINE", COLOR_VERIFIED_GREEN);
+    draw_string(110, 45, "ACTIVE", COLOR_VERIFIED_GREEN);
+    draw_string(110, 55, "ONLINE", COLOR_VERIFIED_GREEN);
+    draw_string(110, 65, "ONLINE", COLOR_VERIFIED_GREEN);
+    draw_string(110, 75, "ACTIVE", COLOR_VERIFIED_GREEN);
+    draw_string(110, 85, "ONLINE", COLOR_VERIFIED_GREEN);
+
+    // Threat counter
+    draw_line(5, 100, 150, 100, COLOR_DIM_GOLD);
+    draw_string(10, 103, "THREATS BLOCKED", COLOR_FORERUNNER_GOLD);
+    draw_string(10, 115, "TODAY", COLOR_SILVER);
+    draw_string(80, 113, "000001", COLOR_ALERT_RED);
+    draw_string(10, 128, "TOTAL", COLOR_SILVER);
+    draw_string(80, 128, "000001", COLOR_ALERT_RED);
+
+    // Right panel - System Info
+    draw_rect(155, 18, 160, 165, COLOR_PANEL_BG);
+    draw_line(155, 18,  315, 18,  COLOR_FORERUNNER_GOLD);
+    draw_line(155, 183, 315, 183, COLOR_FORERUNNER_GOLD);
+    draw_line(155, 18,  155, 183, COLOR_FORERUNNER_GOLD);
+    draw_line(315, 18,  315, 183, COLOR_FORERUNNER_GOLD);
+
+    // Right panel title
+    draw_line(155, 28, 315, 28, COLOR_DIM_GOLD);
+    draw_string(160, 20, "SYSTEM MONITOR", COLOR_FORERUNNER_GOLD);
+
+    // Sentinel logo
+    draw_sentinel_logo(235, 80);
+
+    // System info below logo
+    draw_line(155, 128, 315, 128, COLOR_DIM_GOLD);
+    draw_string(160, 132, "KERNEL", COLOR_SILVER);
+    draw_string(220, 132, "0x100000", COLOR_HARD_LIGHT);
+    draw_string(160, 142, "MEMORY", COLOR_SILVER);
+    draw_string(220, 142, "16MB", COLOR_HARD_LIGHT);
+    draw_string(160, 152, "PAGES", COLOR_SILVER);
+    draw_string(220, 152, "4096", COLOR_HARD_LIGHT);
+    draw_string(160, 162, "TIMER", COLOR_SILVER);
+    draw_string(220, 162, "100HZ", COLOR_HARD_LIGHT);
+    draw_string(160, 172, "ARCH", COLOR_SILVER);
+    draw_string(220, 172, "X86-32", COLOR_HARD_LIGHT);
+}
+
+// Multiboot2 structures
+struct mb2_tag {
+    unsigned int type;
+    unsigned int size;
+};
+
+struct mb2_tag_framebuffer {
+    unsigned int type;
+    unsigned int size;
+    unsigned long long framebuffer_addr;
+    unsigned int framebuffer_pitch;
+    unsigned int framebuffer_width;
+    unsigned int framebuffer_height;
+    unsigned char framebuffer_bpp;
+    unsigned char framebuffer_type;
+    unsigned short reserved;
+};
+
+// Global framebuffer info
+unsigned long long fb_addr = 0;
+unsigned int fb_width = 0;
+unsigned int fb_height = 0;
+unsigned int fb_pitch = 0;
+
+void parse_multiboot(unsigned long long mb_addr)
+{
+    unsigned long long addr = mb_addr + 8;
+    
+    while(1)
+    {
+        struct mb2_tag *tag = (struct mb2_tag *)addr;
+        
+        if(tag->type == 0) break;
+        
+        if(tag->type == 8) // framebuffer tag
+        {
+            struct mb2_tag_framebuffer *fb = 
+                (struct mb2_tag_framebuffer *)addr;
+            fb_addr   = fb->framebuffer_addr;
+            fb_width  = fb->framebuffer_width;
+            fb_height = fb->framebuffer_height;
+            fb_pitch  = fb->framebuffer_pitch;
+        }
+        
+        addr += (tag->size + 7) & ~7;
+    }
+}
+
+void draw_pixel_fb(int x, int y, unsigned int color)
+{
+    if(!fb_addr) return;
+    unsigned int *fb = (unsigned int *)fb_addr;
+    fb[y * (fb_pitch/4) + x] = color;
+}
+
+void fill_rect_fb(int x, int y, int w, int h, unsigned int color)
+{
+    int i, j;
+    for(j = y; j < y+h; j++)
+        for(i = x; i < x+w; i++)
+            draw_pixel_fb(i, j, color);
+}
+
+void kernel_main(unsigned int magic, unsigned int mb_addr)
+{
+    char *video = (char *)0xB8000;
+    
+    int i;
+    for(i = 0; i < 80*25*2; i+=2)
+    {
+        video[i]   = ' ';
+        video[i+1] = 0x0F;
+    }
+
+    if(magic == 0x36d76289)
+    {
+        char *msgs[] = {
+            "SENTINELOS 64-BIT - BOOTING...",
+            "INTERRUPT DESCRIPTOR TABLE: ONLINE",
+            "MEMORY MANAGER: ONLINE",
+            "TRUST REGISTRY: ONLINE",
+            "SHA-256 ENGINE: ONLINE",
+            "PROCESS SCHEDULER: ONLINE",
+            "KEYBOARD DRIVER: ONLINE",
+            "TIMER DRIVER: ONLINE",
+            "VERIFICATION GATE: ACTIVE",
+            "ALL SYSTEMS OPERATIONAL",
+            0
+        };
+
+        unsigned char colors[] = {
+            0x0F,0x0F,0x0F,
+            0x0A,0x0A,0x0A,
+            0x0A,0x0A,
+            0x0E,0x0E
+        };
+
+        int row, j;
+        for(row = 0; msgs[row] != 0; row++)
+        {
+            for(j = 0; msgs[row][j]; j++)
+            {
+                video[row*160 + j*2]   = msgs[row][j];
+                video[row*160 + j*2+1] = colors[row];
+            }
+        }
+    }
 
     while(1) {}
 }

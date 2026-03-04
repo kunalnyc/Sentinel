@@ -38,7 +38,7 @@ void draw_pixel(int x, int y, unsigned char color);
 void draw_rect(int x, int y, int w, int h, unsigned char color);
 void draw_line(int x1, int y1, int x2, int y2, unsigned char color);
 void clear_screen_graphics(unsigned char color);
-
+void bochs_set_mode(unsigned short width, unsigned short height, unsigned short bpp);
 void set_palette_color(unsigned char index, unsigned char r, unsigned char g, unsigned char b);
 void init_forerunner_palette();
 

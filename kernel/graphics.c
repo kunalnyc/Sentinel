@@ -1,10 +1,37 @@
 #include "graphics.h"
 
+
+// Bochs VBE Display Interface
+#define VBE_DISPI_IOPORT_INDEX  0x01CE
+#define VBE_DISPI_IOPORT_DATA   0x01CF
+
+#define VBE_DISPI_INDEX_ID          0
+#define VBE_DISPI_INDEX_XRES        1
+#define VBE_DISPI_INDEX_YRES        2
+#define VBE_DISPI_INDEX_BPP         3
+#define VBE_DISPI_INDEX_ENABLE      4
+#define VBE_DISPI_INDEX_BANK        5
+#define VBE_DISPI_INDEX_VIRT_WIDTH  6
+#define VBE_DISPI_INDEX_VIRT_HEIGHT 7
+#define VBE_DISPI_INDEX_X_OFFSET    8
+#define VBE_DISPI_INDEX_Y_OFFSET    9
+
+#define VBE_DISPI_DISABLED      0x00
+#define VBE_DISPI_ENABLED       0x01
+#define VBE_DISPI_LFB_ENABLED   0x40
+
+
+static void port_write_word(unsigned short port, unsigned short data)
+{
+    __asm__ volatile("outw %0, %1" : : "a"(data), "Nd"(port));
+}
+
 // Write byte to hardware port
 static void port_write(unsigned short port, unsigned char data)
 {
     __asm__ volatile("outb %0, %1" : : "a"(data), "Nd"(port));
 }
+
 
 // Read byte from hardware port
 static unsigned char port_read(unsigned short port)
@@ -13,6 +40,25 @@ static unsigned char port_read(unsigned short port)
     __asm__ volatile("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
+
+static void vbe_write(unsigned short index, unsigned short data)
+{
+    port_write_word(VBE_DISPI_IOPORT_INDEX, index);
+    port_write_word(VBE_DISPI_IOPORT_DATA, data);
+}
+
+void bochs_set_mode(unsigned short width, unsigned short height, unsigned short bpp)
+{
+    vbe_write(VBE_DISPI_INDEX_ENABLE, VBE_DISPI_DISABLED);
+    vbe_write(VBE_DISPI_INDEX_XRES,   width);
+    vbe_write(VBE_DISPI_INDEX_YRES,   height);
+    vbe_write(VBE_DISPI_INDEX_BPP,    bpp);
+    vbe_write(VBE_DISPI_INDEX_ENABLE, VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
+}
+
+
+
+
 
 void graphics_init()
 {
