@@ -10,6 +10,13 @@
 #include "io.h"
 #include <stdint.h>
 #include "shell.h"
+#include "boot_anim.h"
+
+// OS states
+#define STATE_DASHBOARD 0
+#define STATE_SHELL     1
+
+static int os_state = STATE_DASHBOARD;
 // Multiboot2 structures
 struct mb2_tag {
     uint32_t type;
@@ -310,62 +317,43 @@ void draw_main_screen(void) {
 }
 
 // Kernel main
-void kernel_main(unsigned int magic, unsigned int mb_addr) {
-    debug_print("SentinelOS booting...\n");
-    debug_print("Magic: 0x");
-    debug_print_hex32(magic);
-    debug_print("\n");
-
-    // Try VBE first (it gives us real graphics)
-    uint16_t vbe_id = vbe_read_id();
-    debug_print("VBE ID: 0x");
-    debug_print_hex(vbe_id);
-    debug_print("\n");
-    
+void kernel_main(unsigned int magic, unsigned int mb_addr)
+{
     if(graphics_init(1024, 768, 32)) {
-        debug_print("VBE high resolution mode initialized\n");
-        test_framebuffer_direct();
-        draw_main_screen_highres();
     } else {
-        debug_print("VBE failed, checking GRUB framebuffer\n");
-        
-        // Only use GRUB framebuffer if VBE fails
-        if(magic == 0x36d76289) {  // Multiboot2 magic number
-            debug_print("Parsing multiboot for framebuffer\n");
-            parse_multiboot(mb_addr);
-            
-            if(fb_addr && fb_addr != 0xB8000) {  // Ignore text mode buffer
-                debug_print("Using GRUB framebuffer\n");
-                screen.framebuffer = (uint32_t)fb_addr;
-                screen.framebuffer_virtual = (uint32_t)fb_addr;
-                screen.width = fb_width;
-                screen.height = fb_height;
-                screen.pitch = fb_pitch;
-                screen.bpp = 32;
-                screen.bytes_per_pixel = 4;
-                
-                test_framebuffer_direct();
-                draw_main_screen_highres();
-            } else {
-                debug_print("No valid GRUB framebuffer, falling back to VGA\n");
-                graphics_init_vga();
-                init_forerunner_palette();
-                draw_main_screen();
-            }
-        } else {
-            debug_print("Falling back to VGA mode 13h\n");
-            graphics_init_vga();
-            init_forerunner_palette();
-            draw_main_screen();
-        }
+        graphics_init_vga();
+        init_forerunner_palette();
     }
-      // Launch shell
-    //  shell_init();
-    debug_print("Entering main loop\n");
-  
-    while(1) {
-        __asm__ volatile("hlt");
-        //  char c = keyboard_getchar();
-        // if(c) shell_handle_key(c);
+
+    boot_animation();
+    draw_main_screen_highres();
+
+    // NO sti, NO keyboard_init - pure polling
+    while(1)
+    {
+        char c = keyboard_poll();
+        
+        if(os_state == STATE_DASHBOARD)
+        {
+            if(c == '\n') {
+                os_state = STATE_SHELL;
+                clear_screen_graphics(COLOR_SPACE_BLACK);
+                draw_rect(0, 0, screen.width, 20, COLOR_PANEL_BG);
+                draw_line(0, 20, screen.width, 20, COLOR_FORERUNNER_GOLD);
+                draw_string(10, 6, "SENTINELOS TERMINAL", COLOR_FORERUNNER_GOLD);
+                draw_string(screen.width-120, 6, "ESC=DASHBOARD", COLOR_DIM_GOLD);
+                shell_init();
+            }
+        }
+        else if(os_state == STATE_SHELL)
+        {
+            if(c == 27) {
+                os_state = STATE_DASHBOARD;
+                draw_main_screen_highres();
+            }
+            else if(c) {
+                shell_handle_key(c);
+            }
+        }
     }
 }
