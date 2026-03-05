@@ -7,6 +7,7 @@
 // Function signatures
 void keyboard_init();
 char keyboard_getchar();
+char keyboard_poll(void);
 void keyboard_handler();
 
 #endif

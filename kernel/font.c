@@ -60,7 +60,7 @@ uint8_t font_8x8_basic[256][8] = {
 };
 
 void draw_char(char c, int x, int y, uint32_t color, uint32_t bgcolor) {
-    uint8_t* font = font_8x8_basic[(int)c];
+    uint8_t* font = font_8x8_basic[(unsigned char)c];
     
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
@@ -75,13 +75,13 @@ void draw_char(char c, int x, int y, uint32_t color, uint32_t bgcolor) {
 
 void draw_string(int x, int y, const char *str, uint32_t color) {
     int orig_x = x;
-    
     while (*str) {
         if (*str == '\n') {
             x = orig_x;
             y += 10;
         } else {
-            draw_char(*str, x, y, color, 0xFFFFFFFF);
+            if((unsigned char)*str < 128)
+                draw_char(*str, x, y, color, 0xFFFFFFFF);
             x += 8;
         }
         str++;
