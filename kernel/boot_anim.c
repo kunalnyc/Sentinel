@@ -1,167 +1,255 @@
 #include "boot_anim.h"
 #include "graphics.h"
 #include "font.h"
-#include "timer.h"
 
-// Simple delay
-// Better delay - more reliable timing
+extern screen_info_t screen;
+
 static void delay(int ms)
 {
     volatile int i, j;
-    for(i = 0; i < ms * 10; i++)
-        for(j = 0; j < 5000; j++);
+    for(i = 0; i < ms * 20; i++)
+        for(j = 0; j < 8000; j++);
 }
 
-// Draw one pixel at a time along a line - animated
-static void draw_line_anim(int x1, int y1, int x2, int y2, 
-                           unsigned char color, int speed)
+// Draw glowing line (main line + dim glow around it)
+static void draw_glow_line(int x1, int y1, int x2, int y2,
+                           unsigned int color, unsigned int glow)
+{
+    // Glow layers
+    draw_line(x1-1, y1, x2-1, y2, glow);
+    draw_line(x1+1, y1, x2+1, y2, glow);
+    draw_line(x1, y1-1, x2, y2-1, glow);
+    draw_line(x1, y1+1, x2, y2+1, glow);
+    // Main line
+    draw_line(x1, y1, x2, y2, color);
+}
+
+// Animated line pixel by pixel
+static void draw_line_anim(int x1, int y1, int x2, int y2,
+                           unsigned int color, unsigned int glow, int spd)
 {
     int dx = x2-x1, dy = y2-y1;
-    int steps = dx>dy ? dx : dy;
+    int steps = dx > dy ? dx : dy;
     if(steps < 0) steps = -steps;
+    if(steps == 0) return;
     int i;
     for(i = 0; i <= steps; i++)
     {
-        int x = x1 + (dx * i / (steps+1));
-        int y = y1 + (dy * i / (steps+1));
+        int x = x1 + (dx * i / steps);
+        int y = y1 + (dy * i / steps);
+        // Glow
+        draw_pixel(x-1, y,   glow);
+        draw_pixel(x+1, y,   glow);
+        draw_pixel(x,   y-1, glow);
+        draw_pixel(x,   y+1, glow);
+        // Main
         draw_pixel(x, y, color);
-        if(i % speed == 0) delay(1);
+        if(i % spd == 0) delay(1);
     }
 }
 
-// Draw string letter by letter
-static void draw_string_anim(int x, int y, const char *str,
-                              unsigned char color, int delay_ms)
+// Draw letter by letter animated
+static void draw_text_anim(int x, int y, const char *str,
+                           unsigned int color, int ms)
 {
     int i = 0;
-    char buf[2];
-    buf[1] = 0;
+    char buf[2]; buf[1] = 0;
     while(str[i])
     {
         buf[0] = str[i];
-        draw_string(x + i*8, y, buf, color);
-        delay(delay_ms);  // just delay_ms, not * 500
+        draw_string(x + i*10, y, buf, color);
+        // Glow effect - redraw slightly offset in dim color
+        unsigned int glow = 0x331A00;
+        if(color == 0xFFC832) glow = 0x332800;
+        if(color == 0x00FFFF) glow = 0x003333;
+        if(color == 0xFFFFFF) glow = 0x222222;
+        draw_string(x + i*10 - 1, y, buf, glow);
+        delay(ms);
         i++;
     }
 }
 
-// Progress bar
-static void draw_progress(int x, int y, int w, int percent, 
-                          unsigned char color)
+// Draw centered text
+static void draw_centered(int y, const char *str, unsigned int color)
 {
-    // Background
-    draw_rect(x, y, w, 6, COLOR_PANEL_BG);
-    // Border
-    draw_line(x,   y,   x+w, y,   COLOR_DIM_GOLD);
-    draw_line(x,   y+6, x+w, y+6, COLOR_DIM_GOLD);
-    draw_line(x,   y,   x,   y+6, COLOR_DIM_GOLD);
-    draw_line(x+w, y,   x+w, y+6, COLOR_DIM_GOLD);
-    // Fill
-    int fill = (w-2) * percent / 100;
-    draw_rect(x+1, y+1, fill, 4, color);
+    int len = 0;
+    while(str[len]) len++;
+    int x = (screen.width - len * 8) / 2;
+    draw_string(x, y, str, color);
 }
 
-// Draw Sentinel logo animated
-static void draw_logo_animated(int cx, int cy)
+// Draw centered text animated
+static void draw_centered_anim(int y, const char *str,
+                               unsigned int color, int ms)
 {
-    // Draw outer diamond line by line with delay
-    draw_line_anim(cx, cy-40, cx+30, cy,    COLOR_FORERUNNER_GOLD, 2);
-    draw_line_anim(cx+30, cy, cx,    cy+40, COLOR_FORERUNNER_GOLD, 2);
-    draw_line_anim(cx, cy+40, cx-30, cy,    COLOR_FORERUNNER_GOLD, 2);
-    draw_line_anim(cx-30, cy, cx,    cy-40, COLOR_FORERUNNER_GOLD, 2);
+    int len = 0;
+    while(str[len]) len++;
+    int x = (screen.width - len * 10) / 2;
+    draw_text_anim(x, y, str, color, ms);
+}
 
-    delay(200);
+// Draw big diamond logo centered and animated
+static void draw_diamond(int cx, int cy, int size, int animate)
+{
+    unsigned int gold     = 0xFFC832;
+    unsigned int cyan     = 0x00FFFF;
+    unsigned int dgold    = 0x664E14;  // dim gold glow
+    unsigned int dcyan    = 0x004444;  // dim cyan glow
 
-    // Inner diamond
-    draw_line_anim(cx, cy-20, cx+15, cy,    COLOR_NEON_CYAN, 3);
-    draw_line_anim(cx+15, cy, cx,    cy+20, COLOR_NEON_CYAN, 3);
-    draw_line_anim(cx, cy+20, cx-15, cy,    COLOR_NEON_CYAN, 3);
-    draw_line_anim(cx-15, cy, cx,    cy-20, COLOR_NEON_CYAN, 3);
+    int ox = size;
+    int oy = size * 3 / 2;
+    int ix = size / 2;
+    int iy = size * 3 / 4;
 
-    delay(100);
+    if(animate)
+    {
+        // Outer diamond - draw each side animated
+        draw_line_anim(cx,    cy-oy, cx+ox, cy,    gold, dgold, 3);
+        draw_line_anim(cx+ox, cy,    cx,    cy+oy, gold, dgold, 3);
+        draw_line_anim(cx,    cy+oy, cx-ox, cy,    gold, dgold, 3);
+        draw_line_anim(cx-ox, cy,    cx,    cy-oy, gold, dgold, 3);
+        delay(150);
 
-    // Center cross flash
-    draw_line(cx-30, cy, cx+30, cy, COLOR_FORERUNNER_GOLD);
-    draw_line(cx, cy-40, cx, cy+40, COLOR_FORERUNNER_GOLD);
+        // Inner diamond
+        draw_line_anim(cx,    cy-iy, cx+ix, cy,    cyan, dcyan, 4);
+        draw_line_anim(cx+ix, cy,    cx,    cy+iy, cyan, dcyan, 4);
+        draw_line_anim(cx,    cy+iy, cx-ix, cy,    cyan, dcyan, 4);
+        draw_line_anim(cx-ix, cy,    cx,    cy-iy, cyan, dcyan, 4);
+        delay(100);
 
-    delay(300);
+        // Center cross
+        draw_glow_line(cx-ox, cy, cx+ox, cy, gold, dgold);
+        draw_glow_line(cx, cy-oy, cx, cy+oy, gold, dgold);
+    }
+    else
+    {
+        draw_glow_line(cx,    cy-oy, cx+ox, cy,    gold, dgold);
+        draw_glow_line(cx+ox, cy,    cx,    cy+oy, gold, dgold);
+        draw_glow_line(cx,    cy+oy, cx-ox, cy,    gold, dgold);
+        draw_glow_line(cx-ox, cy,    cx,    cy-oy, gold, dgold);
+        draw_glow_line(cx,    cy-iy, cx+ix, cy,    cyan, dcyan);
+        draw_glow_line(cx+ix, cy,    cx,    cy+iy, cyan, dcyan);
+        draw_glow_line(cx,    cy+iy, cx-ix, cy,    cyan, dcyan);
+        draw_glow_line(cx-ix, cy,    cx,    cy-iy, cyan, dcyan);
+        draw_glow_line(cx-ox, cy, cx+ox, cy, gold, dgold);
+        draw_glow_line(cx, cy-oy, cx, cy+oy, gold, dgold);
+    }
+}
+
+// Scanline effect
+static void draw_scanlines()
+{
+    int i;
+    for(i = 0; i < screen.height; i += 4)
+        draw_line(0, i, screen.width, i, 0x03050F);
+}
+
+// Progress bar centered
+static void draw_progress_bar(int percent, unsigned int color)
+{
+    int w = screen.width / 2;
+    int x = screen.width / 4;
+    int y = screen.height * 3 / 4 + 40;
+    int h = 4;
+
+    draw_rect(x-1, y-1, w+2, h+2, 0x111111);
+    draw_line(x, y, x+w, y, 0x333333);
+    int fill = w * percent / 100;
+    draw_rect(x, y, fill, h, color);
+
+    // Glow tip
+    if(fill > 2)
+    {
+        draw_rect(x+fill-2, y-1, 4, h+2, 0xFFFFAA);
+    }
+}
+
+// Flash effect
+static void flash(unsigned int color, int ms)
+{
+    clear_screen_graphics(color);
+    delay(ms);
+    clear_screen_graphics(0x000000);
+    delay(ms);
 }
 
 void boot_animation(void)
 {
-    clear_screen_graphics(COLOR_BLACK);
-    delay(100);  // pause on black
+    int cx = screen.width  / 2;
+    int cy = screen.height / 2;
 
-    // PHASE 1: Logo draws itself slowly
-    draw_logo_animated(160, 70);
+    // ── PHASE 1: Black screen fade in ─────────────────
+    clear_screen_graphics(0x000000);
     delay(400);
 
-    // PHASE 2: Title letter by letter
-    draw_string_anim(88, 120, "SENTINELOS", COLOR_FORERUNNER_GOLD, 15);
+    // ── PHASE 2: Scanlines appear ──────────────────────
+    draw_scanlines();
+    delay(100);
+
+    // ── PHASE 3: Diamond draws itself ─────────────────
+    draw_diamond(cx, cy - 80, 60, 1);
+    delay(500);
+
+    // ── PHASE 4: SENTINELOS title ─────────────────────
+    draw_centered_anim(cy + 10, "SENTINELOS", 0xFFC832, 8);
+    delay(400);
+
+    // Subtitle
+    draw_centered(cy + 30, "SECURE  KERNEL  V0.1", 0x888888);
     delay(200);
-    draw_string(96, 132, "SECURE KERNEL V0.1", COLOR_SILVER);
+
+    // Divider line
+    int lx = screen.width / 4;
+    draw_glow_line(lx, cy+45, screen.width*3/4, cy+45, 0xFFC832, 0x332800);
     delay(300);
 
-    draw_line(60, 142, 260, 142, COLOR_DIM_GOLD);
-    delay(200);
-
-    // PHASE 3: Systems online - slower
-    struct {
-        const char *name;
-        int delay_ms;
-    } systems[] = {
-        {"INTERRUPT DESCRIPTOR TABLE", 30},
-        {"MEMORY MANAGER",             25},
-        {"TRUST REGISTRY",             35},
-        {"SHA-256 ENGINE",             40},
-        {"PROCESS SCHEDULER",          28},
-        {"KEYBOARD DRIVER",            20},
-        {"TIMER DRIVER",               20},
-        {"VERIFICATION GATE",          50},
-        {"GRAPHICS ENGINE",            25},
+    // ── PHASE 5: Systems loading ───────────────────────
+    struct { const char *name; int ms; } sys[] = {
+        {"MEMORY MANAGER",    20},
+        {"TRUST REGISTRY",    25},
+        {"SHA-256 ENGINE",    30},
+        {"VERIFICATION GATE", 35},
+        {"GRAPHICS ENGINE",   20},
     };
 
-    int n = 9;
+    int n = 5;
     int i;
+    int sy = cy + 60;
     for(i = 0; i < n; i++)
     {
-        int y = 150 + i * 10;
-        draw_string(30, y, systems[i].name, COLOR_SILVER);
-        delay(systems[i].delay_ms * 3);
-        draw_string(200, y, ".", COLOR_DIM_GOLD);
-        delay(systems[i].delay_ms * 3);
-        draw_string(206, y, ".", COLOR_DIM_GOLD);
-        delay(systems[i].delay_ms * 3);
-        draw_string(212, y, ".", COLOR_DIM_GOLD);
-        delay(systems[i].delay_ms * 3);
-        draw_string(220, y, "[ OK ]", COLOR_VERIFIED_GREEN);
-        draw_progress(60, 145 + n*10 + 5, 200,
-                     (i+1)*100/n, COLOR_FORERUNNER_GOLD);
-        delay(systems[i].delay_ms * 4);
+        int lw = 0;
+        while(sys[i].name[lw]) lw++;
+        int tx = (screen.width - lw*8 - 80) / 2;
+
+        draw_string(tx, sy + i*16, sys[i].name, 0x888888);
+        delay(sys[i].ms * 4);
+        draw_string(tx, sy + i*16, sys[i].name, 0xCCCCCC);
+        draw_string(tx + lw*8 + 10, sy + i*16, "[ OK ]", 0x00FF64);
+
+        draw_progress_bar((i+1)*100/n, 0xFFC832);
+        delay(sys[i].ms * 5);
     }
 
-    delay(600);
+    delay(800);
 
-    // PHASE 4: Flash
-    clear_screen_graphics(COLOR_FORERUNNER_GOLD);
-    delay(50);
-    clear_screen_graphics(COLOR_BLACK);
-    delay(50);
-    clear_screen_graphics(COLOR_FORERUNNER_GOLD);
-    delay(50);
-    clear_screen_graphics(COLOR_BLACK);
+    // ── PHASE 6: TRUST NOTHING flash ──────────────────
+    clear_screen_graphics(0x000000);
+    delay(100);
+
+    draw_scanlines();
+    draw_diamond(cx, cy - 60, 50, 0);
     delay(200);
 
-    // PHASE 5: Trust Nothing screen
-    clear_screen_graphics(COLOR_SPACE_BLACK);
-    draw_logo_animated(160, 80);
-    delay(300);
-    draw_string_anim(75, 130, "TRUST NOTHING.", COLOR_WHITE, 12);
-    delay(600);
-    draw_string_anim(58, 145, "VERIFY EVERYTHING.", COLOR_WHITE, 12);
-    delay(1000);
+    draw_centered_anim(cy + 20,  "TRUST  NOTHING.", 0xFFFFFF, 6);
+    delay(400);
+    draw_centered_anim(cy + 40, "VERIFY  EVERYTHING.", 0xFFC832, 6);
+    delay(800);
 
-    // Flash to dashboard
-    clear_screen_graphics(COLOR_FORERUNNER_GOLD);
-    delay(80);
+    // ── PHASE 7: Final flash to dashboard ─────────────
+    flash(0xFFC832, 40);
+    delay(50);
+    flash(0x00FFFF, 30);
+    delay(50);
+    clear_screen_graphics(0x000000);
+    delay(100);
 }
