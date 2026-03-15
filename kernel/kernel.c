@@ -11,7 +11,8 @@
 #include <stdint.h>
 #include "shell.h"
 #include "boot_anim.h"
-
+#include "mouse.h"
+#include "mem_mgr.h"
 // OS states
 #define STATE_DASHBOARD 0
 #define STATE_SHELL     1
@@ -324,13 +325,15 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
         graphics_init_vga();
         init_forerunner_palette();
     }
-
+    mem_init();
+    mouse_init();
     boot_animation();
     draw_main_screen_highres();
 
     // NO sti, NO keyboard_init - pure polling
     while(1)
     {
+        mouse_poll();
         char c = keyboard_poll();
         
         if(os_state == STATE_DASHBOARD)
