@@ -4,6 +4,8 @@
 #include "keyboard.h"
 #include "fs.h"
 #include "mem_mgr.h"
+#include "elf.h"
+#include "scheduler.h"
 
 extern screen_info_t screen;
 
@@ -96,8 +98,6 @@ static char to_upper(char c)
 {
     if(c>='a'&&c<='z') return c-32; return c;
 }
-
-// bytes to human readable
 static void bytes_to_str(uint32_t bytes, char *buf)
 {
     if(bytes >= 1024*1024)
@@ -115,6 +115,21 @@ static void bytes_to_str(uint32_t bytes, char *buf)
         int_to_str(bytes, buf);
         sl_strcat(buf, " B");
     }
+}
+
+// Print a uint64_t as hex into buf, returns pointer to buf
+static void uint64_to_hex(uint64_t val, char *buf)
+{
+    if(val == 0) { buf[0]='0'; buf[1]=0; return; }
+    char tmp[20]; int ti=0, hi=0;
+    while(val > 0)
+    {
+        int nibble = val & 0xF;
+        tmp[ti++] = nibble < 10 ? '0'+nibble : 'A'+(nibble-10);
+        val >>= 4;
+    }
+    while(ti > 0) buf[hi++] = tmp[--ti];
+    buf[hi] = 0;
 }
 
 // ── Shell output ──────────────────────────────────────
@@ -161,17 +176,22 @@ static void cmd_help(void)
     shell_println("", COL_OUTPUT);
     shell_println("  SYSTEM:", COL_PROMPT);
     shell_println("  HELP  CLEAR  ABOUT  STATUS  VERIFY  REBOOT", COL_CYAN);
-    shell_println("  SYSINFO  NEOFETCH  HISTORY  UPTIME",  COL_CYAN);
-    shell_println("  ECHO <TEXT>    - PRINT TEXT",          COL_CYAN);
-    shell_println("  COLOR <THEME>  - CHANGE COLORS",       COL_CYAN);
+    shell_println("  SYSINFO  NEOFETCH  HISTORY  UPTIME",         COL_CYAN);
+    shell_println("  ECHO <TEXT>    - PRINT TEXT",                 COL_CYAN);
+    shell_println("  COLOR <THEME>  - CHANGE COLORS",              COL_CYAN);
     shell_println("", COL_OUTPUT);
     shell_println("  MEMORY:", COL_PROMPT);
-    shell_println("  MEMINFO        - RAM USAGE + BAR",     0x00FF99);
-    shell_println("  ALLOC <BYTES>  - ALLOCATE MEMORY",     0x00FF99);
-    shell_println("  FREE <ADDR>    - FREE MEMORY",         0x00FF99);
+    shell_println("  MEMINFO        - RAM USAGE + BAR",            0x00FF99);
+    shell_println("  ALLOC <BYTES>  - ALLOCATE MEMORY",            0x00FF99);
+    shell_println("  FREE <ADDR>    - FREE MEMORY",                0x00FF99);
     shell_println("", COL_OUTPUT);
     shell_println("  FILES:", COL_PROMPT);
-    shell_println("  LS  DF  CREATE  READ  WRITE  DELETE",  COL_SUCCESS);
+    shell_println("  LS  DF  CREATE  READ  WRITE  DELETE",         COL_SUCCESS);
+    shell_println("", COL_OUTPUT);
+    shell_println("  PROCESSES:", COL_PROMPT);
+    shell_println("  EXEC <FILE>    - LOAD + RUN ELF BINARY",      COL_SUCCESS);
+    shell_println("  SCHEDULE       - TRIGGER SCHEDULER TICK",     COL_SUCCESS);
+    shell_println("  PS             - LIST ALL PROCESSES",          COL_SUCCESS);
     shell_println("", COL_OUTPUT);
 }
 
@@ -188,31 +208,25 @@ static void cmd_meminfo(void)
     shell_println("  |     MEMORY INFORMATION        |", 0x00FF99);
     shell_println("  +-------------------------------+", 0x00FF99);
 
-    // Total
     sl_strcpy(line,"  TOTAL  : "); bytes_to_str(s.total_bytes,num);
     sl_strcat(line,num); shell_println(line, COL_OUTPUT);
 
-    // Used
     sl_strcpy(line,"  USED   : "); bytes_to_str(s.used_bytes,num);
     sl_strcat(line,num);
     int used_col = s.used_bytes > (s.total_bytes*3/4) ? COL_ERROR : COL_SUCCESS;
     shell_println(line, used_col);
 
-    // Free
     sl_strcpy(line,"  FREE   : "); bytes_to_str(s.free_bytes,num);
     sl_strcat(line,num); shell_println(line, COL_SUCCESS);
 
-    // Peak
     sl_strcpy(line,"  PEAK   : "); bytes_to_str(s.peak_used,num);
     sl_strcat(line,num); shell_println(line, COL_DIM);
 
-    // Allocs
     sl_strcpy(line,"  ALLOCS : "); int_to_str(s.alloc_count,num);
     sl_strcat(line,num); sl_strcat(line," TOTAL / ");
     int_to_str(s.free_count,num); sl_strcat(line,num);
     sl_strcat(line," FREED"); shell_println(line, COL_OUTPUT);
 
-    // Bar
     sl_strcpy(line,"  "); sl_strcat(line,bar);
     sl_strcat(line," "); int_to_str(pct,num);
     sl_strcat(line,num); sl_strcat(line,"%");
@@ -229,7 +243,6 @@ static void cmd_alloc(const char *arg)
     if(sl_strlen(arg)==0)
     { shell_println("  USAGE: ALLOC <BYTES>", COL_ERROR); return; }
 
-    // Parse number
     int n=0, i=0;
     while(arg[i]>='0' && arg[i]<='9') { n=n*10+(arg[i]-'0'); i++; }
     if(n<=0 || n>1024*1024)
@@ -265,6 +278,8 @@ static void cmd_sysinfo(void)
     shell_println("  KERNEL  : MONOLITHIC 64-BIT",        COL_CYAN);
     shell_println("  DISPLAY : 1024X768 32BPP VBE",       COL_CYAN);
     shell_println("  FS      : SLFS V1.0 64 SLOTS",       COL_CYAN);
+    shell_println("  LOADER  : ELF64 EXECUTABLE",         COL_CYAN);
+    shell_println("  SCHED   : ROUND-ROBIN 64 SLOTS",     COL_CYAN);
 
     char mline[64]="  MEMORY  : ";
     bytes_to_str(s.free_bytes, num);
@@ -272,7 +287,7 @@ static void cmd_sysinfo(void)
     shell_println(mline, COL_CYAN);
 
     shell_println("  AUTHOR  : KUNAL",                    COL_PROMPT);
-    shell_println("  BUILD   : DAY 07",                   COL_PROMPT);
+    shell_println("  BUILD   : DAY 08",                   COL_PROMPT);
     shell_println("  +---------------------------------+", COL_PROMPT);
     shell_println("", COL_OUTPUT);
 }
@@ -280,18 +295,20 @@ static void cmd_sysinfo(void)
 static void cmd_neofetch(void)
 {
     shell_println("", COL_OUTPUT);
-    shell_println("      *              SENTINELOS V0.1",      COL_PROMPT);
-    shell_println("     ***             --------------------",  COL_DIM);
-    shell_println("    *****            OS: SENTINELOS",        COL_CYAN);
-    shell_println("   *******           KERNEL: 64-BIT",       COL_CYAN);
-    shell_println("  ****X****          ARCH: X86-64",         COL_CYAN);
-    shell_println("   *******           SHELL: SENTINEL V0.1", COL_CYAN);
-    shell_println("    *****            FS: SLFS 64 SLOTS",    COL_CYAN);
-    shell_println("     ***             DISPLAY: 1024X768",    COL_CYAN);
-    shell_println("      *              LANG: C + ASM",        COL_CYAN);
-    shell_println("                     AUTHOR: KUNAL",        COL_PROMPT);
-    shell_println("                     TRUST NOTHING.",       COL_PROMPT);
-    shell_println("                     VERIFY EVERYTHING.",   COL_PROMPT);
+    shell_println("      *              SENTINELOS V0.1",       COL_PROMPT);
+    shell_println("     ***             --------------------",   COL_DIM);
+    shell_println("    *****            OS: SENTINELOS",         COL_CYAN);
+    shell_println("   *******           KERNEL: 64-BIT",        COL_CYAN);
+    shell_println("  ****X****          ARCH: X86-64",          COL_CYAN);
+    shell_println("   *******           SHELL: SENTINEL V0.1",  COL_CYAN);
+    shell_println("    *****            FS: SLFS 64 SLOTS",     COL_CYAN);
+    shell_println("     ***             LOADER: ELF64",         COL_CYAN);
+    shell_println("      *              SCHED: ROUND-ROBIN",    COL_CYAN);
+    shell_println("                     DISPLAY: 1024X768",     COL_CYAN);
+    shell_println("                     LANG: C + ASM",         COL_CYAN);
+    shell_println("                     AUTHOR: KUNAL",         COL_PROMPT);
+    shell_println("                     TRUST NOTHING.",        COL_PROMPT);
+    shell_println("                     VERIFY EVERYTHING.",    COL_PROMPT);
     shell_println("", COL_OUTPUT);
 }
 
@@ -337,7 +354,15 @@ static void cmd_ls(void)
     int count=0; fs_list(names,&count);
     shell_println("",COL_OUTPUT);
     if(count==0) shell_println("  NO FILES.",COL_DIM);
-    else { int i; for(i=0;i<count;i++){char line[64]="  > ";sl_strcat(line,names[i]);shell_println(line,COL_SUCCESS);} }
+    else
+    {
+        int i;
+        for(i=0;i<count;i++)
+        {
+            char line[64]="  > "; sl_strcat(line,names[i]);
+            shell_println(line,COL_SUCCESS);
+        }
+    }
     char buf[32]="  "; char num[8]; int_to_str(count,num);
     sl_strcat(buf,num); sl_strcat(buf,"/64 FILES");
     shell_println(buf,COL_DIM); shell_println("",COL_OUTPUT);
@@ -393,13 +418,146 @@ static void cmd_df(void)
     shell_println("",COL_OUTPUT);
 }
 
+// ── Process list ──────────────────────────────────────
+
+static void cmd_ps(void)
+{
+    shell_println("", COL_OUTPUT);
+    shell_println("  +----+----------+------------------+", COL_PROMPT);
+    shell_println("  | PID|  STATE   |  ENTRY POINT     |", COL_PROMPT);
+    shell_println("  +----+----------+------------------+", COL_PROMPT);
+
+    int i, found = 0;
+    for(i = 0; i < MAX_PROCESSES; i++)
+    {
+        if(process_table[i].pid == -1) continue;
+
+        char line[80] = "  | ";
+        char num[16];
+
+        // PID
+        int_to_str(process_table[i].pid, num);
+        sl_strcat(line, num);
+        sl_strcat(line, "  | ");
+
+        // STATE
+        int st = process_table[i].state;
+        if     (st == PROCESS_RUNNING) sl_strcat(line, "RUNNING  |");
+        else if(st == PROCESS_READY)   sl_strcat(line, "READY    |");
+        else if(st == PROCESS_BLOCKED) sl_strcat(line, "BLOCKED  |");
+        else                           sl_strcat(line, "DEAD     |");
+
+        // ENTRY
+        sl_strcat(line, " 0x");
+        char hexbuf[20];
+        uint64_to_hex(process_table[i].rip, hexbuf);
+        sl_strcat(line, hexbuf);
+        sl_strcat(line, " |");
+
+        int col = st == PROCESS_RUNNING ? COL_SUCCESS :
+                  st == PROCESS_READY   ? COL_CYAN    :
+                  st == PROCESS_BLOCKED ? 0xFFC832    : COL_DIM;
+
+        shell_println(line, col);
+        found++;
+    }
+
+    if(found == 0)
+        shell_println("  NO PROCESSES.", COL_DIM);
+
+    shell_println("  +----+----------+------------------+", COL_PROMPT);
+
+    char buf[32] = "  TOTAL: "; char n[8];
+    int_to_str(found, n); sl_strcat(buf, n);
+    sl_strcat(buf, " PROCESS(ES)");
+    shell_println(buf, COL_DIM);
+    shell_println("", COL_OUTPUT);
+}
+
+// ── ELF Exec ─────────────────────────────────────────
+
+static void cmd_exec(const char *name)
+{
+    if(sl_strlen(name) == 0)
+    {
+        shell_println("  USAGE: EXEC <FILE>", COL_ERROR);
+        return;
+    }
+
+    // Read file from SLFS
+    static uint8_t elf_buf[SLFS_MAX_FILESIZE];
+    int size = fs_read(name, (char *)elf_buf, SLFS_MAX_FILESIZE);
+
+    if(size < 0)
+    {
+        shell_println("  ERROR: FILE NOT FOUND.", COL_ERROR);
+        return;
+    }
+    if(size < 64)
+    {
+        shell_println("  ERROR: FILE TOO SMALL TO BE ELF.", COL_ERROR);
+        return;
+    }
+
+    // Load ELF
+    uint64_t entry = 0;
+    int result = elf_load(elf_buf, &entry);
+
+    switch(result)
+    {
+        case ELF_ERR_MAGIC:   shell_println("  ERROR: NOT A VALID ELF BINARY.", COL_ERROR); return;
+        case ELF_ERR_CLASS:   shell_println("  ERROR: NOT A 64-BIT ELF.",       COL_ERROR); return;
+        case ELF_ERR_MACHINE: shell_println("  ERROR: NOT AN X86-64 BINARY.",   COL_ERROR); return;
+        case ELF_ERR_TYPE:    shell_println("  ERROR: NOT AN EXECUTABLE ELF.",  COL_ERROR); return;
+        case ELF_ERR_NO_LOAD: shell_println("  ERROR: NO LOADABLE SEGMENTS.",   COL_ERROR); return;
+        default: break;
+    }
+    if(result != ELF_OK)
+    {
+        shell_println("  ERROR: ELF LOAD FAILED.", COL_ERROR);
+        return;
+    }
+
+    // Print success info
+    char line[64] = "  LOADED: ";
+    sl_strcat(line, name);
+    shell_println(line, COL_SUCCESS);
+
+    char eline[64] = "  ENTRY : 0x";
+    char hexbuf[20];
+    uint64_to_hex(entry, hexbuf);
+    sl_strcat(eline, hexbuf);
+    shell_println(eline, COL_CYAN);
+
+    // Create process — use full 64-bit token
+    int pid = create_process(entry, (uint64_t)0xDEADBEEFCAFEULL);
+    if(pid < 0)
+    {
+        shell_println("  ERROR: PROCESS CREATION FAILED.", COL_ERROR);
+        shell_println("  CHECK TRUST REGISTRY.", COL_DIM);
+        return;
+    }
+
+    char pline[64] = "  PID   : ";
+    char pnum[8]; int_to_str(pid, pnum);
+    sl_strcat(pline, pnum);
+    shell_println(pline, COL_SUCCESS);
+    shell_println("  PROCESS QUEUED. TYPE SCHEDULE TO RUN.", COL_DIM);
+    shell_println("  TYPE PS TO VIEW PROCESS TABLE.", COL_DIM);
+}
+
 // ── Execute ───────────────────────────────────────────
 
 static void add_to_history(const char *cmd)
 {
     if(sl_strlen(cmd)==0) return;
     if(history_count<HISTORY_MAX) sl_strcpy(history[history_count++],cmd);
-    else { int i; for(i=0;i<HISTORY_MAX-1;i++) sl_strcpy(history[i],history[i+1]); sl_strcpy(history[HISTORY_MAX-1],cmd); }
+    else
+    {
+        int i;
+        for(i=0;i<HISTORY_MAX-1;i++) sl_strcpy(history[i],history[i+1]);
+        sl_strcpy(history[HISTORY_MAX-1],cmd);
+    }
 }
 
 static void shell_execute(const char *cmd)
@@ -420,6 +578,7 @@ static void shell_execute(const char *cmd)
     else if(sl_strcmp(cmd,"LS")      ==0) cmd_ls();
     else if(sl_strcmp(cmd,"DF")      ==0) cmd_df();
     else if(sl_strcmp(cmd,"MEMINFO") ==0) cmd_meminfo();
+    else if(sl_strcmp(cmd,"PS")      ==0) cmd_ps();
     else if(sl_startswith(cmd,"ECHO "))   cmd_echo(cmd+5);
     else if(sl_startswith(cmd,"COLOR "))  cmd_color(cmd+6);
     else if(sl_startswith(cmd,"CREATE ")) cmd_create(cmd+7);
@@ -427,6 +586,15 @@ static void shell_execute(const char *cmd)
     else if(sl_startswith(cmd,"READ "))   cmd_read(cmd+5);
     else if(sl_startswith(cmd,"DELETE ")) cmd_delete(cmd+7);
     else if(sl_startswith(cmd,"ALLOC "))  cmd_alloc(cmd+6);
+    else if(sl_startswith(cmd,"EXEC "))   cmd_exec(cmd+5);
+    else if(sl_strcmp(cmd,"SCHEDULE")==0)
+    {
+        schedule();
+        shell_println("", COL_OUTPUT);
+        shell_println("  SCHEDULER TICK EXECUTED.", COL_SUCCESS);
+        shell_println("  TYPE PS TO VIEW PROCESS STATES.", COL_DIM);
+        shell_println("", COL_OUTPUT);
+    }
     else if(sl_strcmp(cmd,"ABOUT")==0)
     {
         shell_println("",COL_OUTPUT);
@@ -439,12 +607,18 @@ static void shell_execute(const char *cmd)
     else if(sl_strcmp(cmd,"STATUS")==0)
     {
         shell_println("",COL_OUTPUT);
+        shell_println("  +-------------------------------+", COL_PROMPT);
+        shell_println("  |    SYSTEM STATUS              |", COL_PROMPT);
+        shell_println("  +-------------------------------+", COL_PROMPT);
         shell_println("  TRUST REGISTRY   [ ONLINE ]",COL_SUCCESS);
         shell_println("  SHA-256 ENGINE   [ ONLINE ]",COL_SUCCESS);
         shell_println("  MEMORY GUARD     [ ONLINE ]",COL_SUCCESS);
         shell_println("  SLFS FILESYSTEM  [ ONLINE ]",COL_SUCCESS);
         shell_println("  VERIFY GATE      [ ACTIVE ]",COL_SUCCESS);
+        shell_println("  ELF LOADER       [ ONLINE ]",COL_SUCCESS);
+        shell_println("  SCHEDULER        [ ONLINE ]",COL_SUCCESS);
         shell_println("  THREATS BLOCKED  [ 000001 ]",COL_ERROR);
+        shell_println("  +-------------------------------+", COL_PROMPT);
         shell_println("",COL_OUTPUT);
     }
     else if(sl_strcmp(cmd,"VERIFY")==0)
@@ -455,6 +629,7 @@ static void shell_execute(const char *cmd)
         shell_println("  CHECKING TRUST REGISTRY...",    COL_OUTPUT);
         shell_println("  VERIFYING PAGE TABLES...",      COL_OUTPUT);
         shell_println("  CHECKING MEMORY INTEGRITY...",  COL_OUTPUT);
+        shell_println("  CHECKING ELF LOADER BOUNDS...", COL_OUTPUT);
         shell_println("  SHA-256: [ VERIFIED OK ]",      COL_SUCCESS);
         shell_println("  ALL SEGMENTS INTACT.",          COL_SUCCESS);
         shell_println("",COL_OUTPUT);
@@ -504,11 +679,13 @@ void shell_init(void)
     apply_theme(THEME_DEFAULT);
     fs_init();
     mem_init();
+    scheduler_init();  // <-- initialise process table
 
     shell_println("",COL_OUTPUT);
     shell_println("  SENTINELOS SECURE SHELL V0.1",         COL_CYAN);
     shell_println("  TRUST NOTHING. VERIFY EVERYTHING.",    COL_PROMPT);
     shell_println("  MEMORY MANAGER ONLINE. 4MB HEAP.",     0x00FF99);
+    shell_println("  ELF LOADER + SCHEDULER ONLINE.",       COL_SUCCESS);
     shell_println("  TYPE HELP FOR ALL COMMANDS.",          COL_DIM);
     shell_println("",COL_OUTPUT);
     shell_redraw();

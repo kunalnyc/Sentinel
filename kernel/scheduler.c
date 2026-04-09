@@ -20,7 +20,7 @@ void scheduler_init()
     }
 }
 
-int create_process(unsigned int entry_point, unsigned int token)
+int create_process(uint64_t entry_point, uint64_t token)
 {
     // SECURITY CHECK FIRST - before anything else!
     // Find process in trust registry by token
@@ -44,7 +44,7 @@ int create_process(unsigned int entry_point, unsigned int token)
     // Token verified - create process
     process_table[i].pid            = process_count++;
     process_table[i].state          = PROCESS_READY;
-    process_table[i].eip            = entry_point;
+    process_table[i].rip            = entry_point;
     process_table[i].identity_token = token;
 
     return process_table[i].pid;
