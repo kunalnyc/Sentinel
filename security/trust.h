@@ -1,12 +1,14 @@
 #ifndef TRUST_H
 #define TRUST_H
 
+#include <stdint.h>
+
 // A trusted process entry in the registry
 struct TrustedProcess {
-   unsigned int identity_token;  // unique identity token
-   char name[64];  // max 64 characters        
-   unsigned char hash[32];  // SHA-256 = exactly 32 bytes
-   unsigned char trust_level;  // 0=kernel, 1=system, 2=user
+    uint64_t      identity_token;  // unique identity token
+    char          name[64];        // max 64 characters
+    unsigned char hash[32];        // SHA-256 = exactly 32 bytes
+    unsigned char trust_level;     // 0=kernel, 1=system, 2=user
 };
 
 // Trust levels
@@ -22,7 +24,7 @@ extern struct TrustedProcess trust_registry[MAX_TRUSTED_PROCESSES];
 extern int registry_count;
 
 // Function signatures
-int verify_process(unsigned int token, unsigned char *hash);
-void register_process(unsigned int token, char *name, unsigned char *hash, unsigned char trust_level);
+int  verify_process(uint64_t token, unsigned char *hash);
+void register_process(uint64_t token, char *name, unsigned char *hash, unsigned char trust_level);
 
 #endif

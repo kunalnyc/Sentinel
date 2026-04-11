@@ -13,6 +13,8 @@
 #include "boot_anim.h"
 #include "mouse.h"
 #include "mem_mgr.h"
+#include "hello_elf.h"
+#include "fs.h"
 // OS states
 #define STATE_DASHBOARD 0
 #define STATE_SHELL     1
@@ -327,6 +329,13 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
     }
     mem_init();
     mouse_init();
+     // Pre-load HELLO.ELF into SLFS before shell starts
+    fs_init();
+    fs_create("HELLO");
+    fs_write("HELLO", (char*)programs_hello_elf, programs_hello_elf_len);
+    unsigned char hello_hash[32];
+    sha256_compute(programs_hello_elf, programs_hello_elf_len, hello_hash);
+    register_process(0xDEADBEEFCAFEULL, "HELLO", hello_hash, TRUST_KERNEL);
     boot_animation();
     draw_main_screen_highres();
 

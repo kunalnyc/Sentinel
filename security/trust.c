@@ -3,7 +3,7 @@
 struct TrustedProcess trust_registry[MAX_TRUSTED_PROCESSES];
 int registry_count = 0;
 // Register a trusted process into the registry
-void register_process(unsigned int token, char *name, unsigned char *hash, unsigned char trust_level)
+void register_process(uint64_t token, char *name, unsigned char *hash, unsigned char trust_level)
 {
     if (registry_count >= MAX_TRUSTED_PROCESSES)
     {
@@ -33,7 +33,7 @@ while(i < 32)
 }
 
 // Verify a process before allowing it to run
-int verify_process(unsigned int token, unsigned char *hash)
+int verify_process(uint64_t token, unsigned char *hash)
 {
     // loop through registry
     for(int i = 0; i < registry_count; i++)
