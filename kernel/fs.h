@@ -5,7 +5,7 @@
 
 #define SLFS_MAX_FILES     64
 #define SLFS_MAX_FILENAME  32
-#define SLFS_MAX_FILESIZE  512
+#define SLFS_MAX_FILESIZE  8192
 #define SLFS_MAGIC         0x534C4653  // "SLFS"
 
 #define SLFS_TYPE_EMPTY    0x00

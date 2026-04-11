@@ -677,7 +677,6 @@ void shell_init(void)
     total_lines=0; input_len=0; input_buf[0]=0;
     history_count=0; uptime_ticks=0;
     apply_theme(THEME_DEFAULT);
-    fs_init();
     mem_init();
     scheduler_init();  // <-- initialise process table
 
