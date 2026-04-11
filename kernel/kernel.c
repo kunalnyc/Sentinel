@@ -333,7 +333,9 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
     fs_init();
     fs_create("HELLO");
     fs_write("HELLO", (char*)programs_hello_elf, programs_hello_elf_len);
-
+    unsigned char hello_hash[32];
+    sha256_compute(programs_hello_elf, programs_hello_elf_len, hello_hash);
+    register_process(0xDEADBEEFCAFEULL, "HELLO", hello_hash, TRUST_KERNEL);
     boot_animation();
     draw_main_screen_highres();
 

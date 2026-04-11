@@ -6,6 +6,8 @@
 #include "mem_mgr.h"
 #include "elf.h"
 #include "scheduler.h"
+#include "../security/sha256.h"
+#include "../security/trust.h"
 
 extern screen_info_t screen;
 
@@ -193,6 +195,7 @@ static void cmd_help(void)
     shell_println("  SCHEDULE       - TRIGGER SCHEDULER TICK",     COL_SUCCESS);
     shell_println("  PS             - LIST ALL PROCESSES",          COL_SUCCESS);
     shell_println("", COL_OUTPUT);
+    shell_println("  TRUST <FILE>   - REGISTER BINARY AS TRUSTED",  COL_SUCCESS);
 }
 
 static void cmd_meminfo(void)
@@ -473,6 +476,40 @@ static void cmd_ps(void)
     shell_println(buf, COL_DIM);
     shell_println("", COL_OUTPUT);
 }
+ // Trust registry and ELF execution commands ─────────────────────────
+static void cmd_trust(const char *name)
+{
+    if(sl_strlen(name) == 0)
+    {
+        shell_println("  USAGE: TRUST <FILE>", COL_ERROR);
+        return;
+    }
+
+    static uint8_t tbuf[SLFS_MAX_FILESIZE];
+    int size = fs_read(name, (char *)tbuf, SLFS_MAX_FILESIZE);
+    if(size < 0)
+    {
+        shell_println("  ERROR: FILE NOT FOUND.", COL_ERROR);
+        return;
+    }
+
+    // Compute hash
+    unsigned char thash[32];
+    sha256_compute(tbuf, (unsigned int)size, thash);
+
+    // Generate token from first 8 bytes of hash
+    uint64_t token = 0;
+    int ti;
+    for(ti = 0; ti < 8; ti++)
+        token = (token << 8) | thash[ti];
+
+    register_process(token, (char*)name, thash, TRUST_USER);
+
+    char line[64] = "  TRUSTED: ";
+    sl_strcat(line, name);
+    shell_println(line, COL_SUCCESS);
+    shell_println("  HASH REGISTERED. EXEC WILL NOW WORK.", COL_DIM);
+}
 
 // ── ELF Exec ─────────────────────────────────────────
 
@@ -529,12 +566,27 @@ static void cmd_exec(const char *name)
     sl_strcat(eline, hexbuf);
     shell_println(eline, COL_CYAN);
 
-    // Create process — use full 64-bit token
-    int pid = create_process(entry, (uint64_t)0xDEADBEEFCAFEULL);
+   // Compute SHA-256 of the raw ELF binary
+    unsigned char elf_hash[32];
+    sha256_compute(elf_buf, (unsigned int)size, elf_hash);
+    shell_println("  VERIFYING BINARY SIGNATURE...", COL_DIM);
+
+    // Verify against trust registry
+    uint64_t token = 0xDEADBEEFCAFEULL;
+    if(!verify_process(token, elf_hash))
+    {
+        shell_println("  SECURITY: UNTRUSTED BINARY.", COL_ERROR);
+        shell_println("  EXECUTION DENIED. HASH MISMATCH.", COL_ERROR);
+        shell_println("  USE TRUST <FILE> TO REGISTER.", COL_DIM);
+        return;
+    }
+
+    shell_println("  SIGNATURE VERIFIED. [ OK ]", COL_SUCCESS);
+
+    int pid = create_process(entry, token);
     if(pid < 0)
     {
         shell_println("  ERROR: PROCESS CREATION FAILED.", COL_ERROR);
-        shell_println("  CHECK TRUST REGISTRY.", COL_DIM);
         return;
     }
 
@@ -639,6 +691,7 @@ static void shell_execute(const char *cmd)
         shell_println("  REBOOTING...",COL_ERROR);
         __asm__ volatile("mov $0xFE, %al\n out %al, $0x64\n");
     }
+    else if(sl_startswith(cmd,"TRUST "))   cmd_trust(cmd+6);
     else
     {
         char msg[64]="  UNKNOWN: "; sl_strcat(msg,cmd);
