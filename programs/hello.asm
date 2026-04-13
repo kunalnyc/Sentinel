@@ -8,19 +8,9 @@ section .text
 global _start
 
 _start:
-    ; Write 'H' to VGA text buffer at 0xB8000
-    ; Each character = 2 bytes: [char][color]
-    ; Color 0x0A = bright green on black
-
+    ; Write directly to VGA at top-left
     mov rax, 0xB8000
-    mov byte [rax + 0],  'H'
-    mov byte [rax + 1],  0x0A
-    mov byte [rax + 2],  'I'
-    mov byte [rax + 3],  0x0A
-    mov byte [rax + 4],  '!'
-    mov byte [rax + 5],  0x0A
-
-    ; Halt — spin forever
-.hang:
-    hlt
-    jmp .hang
+    mov word [rax], 0x0A48    ; 'H' green
+    mov word [rax+2], 0x0A49  ; 'I' green  
+    mov word [rax+4], 0x0A21  ; '!' green
+    ret

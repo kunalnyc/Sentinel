@@ -66,18 +66,16 @@ void schedule()
             current_process = i;
             process_table[i].state = PROCESS_RUNNING;
 
-            // Set up process stack at top of its stack array
-            uint64_t proc_rsp = (uint64_t)&process_table[i].stack[1023];
+            // Set up process stack - leave room for return address
+            uint64_t *proc_stack = &process_table[i].stack[1020];
+            
+            // Align stack to 16 bytes
+            uint64_t proc_rsp = (uint64_t)proc_stack & ~0xFULL;
 
-            // Align to 16 bytes (ABI requirement)
-            proc_rsp &= ~0xFULL;
-
-            // CONTEXT SWITCH — jump into the process
             context_switch(&kernel_rsp_save,
                            process_table[i].rip,
                            proc_rsp);
 
-            // If process returns, mark it dead
             process_table[i].state = PROCESS_DEAD;
             return;
         }
