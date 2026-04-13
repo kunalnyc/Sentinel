@@ -334,6 +334,7 @@ static void cmd_history(void)
 
 static void cmd_uptime(void)
 {
+    
     shell_println("", COL_OUTPUT);
     char line[64]="  UPTIME: "; char num[16];
     int_to_str(uptime_ticks,num); sl_strcat(line,num);

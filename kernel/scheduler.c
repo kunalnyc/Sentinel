@@ -1,11 +1,17 @@
 #include "scheduler.h"
 #include "../security/trust.h"
-
+#include <stdint.h>
 // Actual definitions
 struct Process process_table[MAX_PROCESSES];
 int process_count = 0;
 int current_process = 0;
+uint64_t kernel_rsp_save = 0;
 
+
+// Assembly context switch
+extern void context_switch(uint64_t *kernel_rsp_save,
+                           uint64_t proc_rip,
+                           uint64_t proc_rsp);
 // forward declaration
 void println(char *str);
 
@@ -59,7 +65,20 @@ void schedule()
         {
             current_process = i;
             process_table[i].state = PROCESS_RUNNING;
-            // In future: context switch here
+
+            // Set up process stack at top of its stack array
+            uint64_t proc_rsp = (uint64_t)&process_table[i].stack[1023];
+
+            // Align to 16 bytes (ABI requirement)
+            proc_rsp &= ~0xFULL;
+
+            // CONTEXT SWITCH — jump into the process
+            context_switch(&kernel_rsp_save,
+                           process_table[i].rip,
+                           proc_rsp);
+
+            // If process returns, mark it dead
+            process_table[i].state = PROCESS_DEAD;
             return;
         }
     }
