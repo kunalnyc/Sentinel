@@ -23,6 +23,12 @@ all: sentinel.bin programs/hello.elf
 kernel/boot.o: kernel/boot.asm
 	$(AS) -f elf64 kernel/boot.asm -o kernel/boot.o
 
+kernel/context.o: kernel/context.asm
+	$(AS) -f elf64 kernel/context.asm -o kernel/context.o
+
+sentinel.bin: kernel/boot.o kernel/context.o $(C_OBJECTS)
+	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
+
 # ── Kernel C objects ──────────────────────────────────────────────────
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -45,5 +51,6 @@ clean:
 	rm -f bootloader/*.o bootloader/*.bin
 	rm -f $(C_OBJECTS)
 	rm -f programs/*.o programs/*.elf
+	rm -f kernel/*.o
 
 .PHONY: all clean

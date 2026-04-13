@@ -48,7 +48,7 @@ struct Process {
 extern struct Process process_table[MAX_PROCESSES];
 extern int process_count;
 extern int current_process;
-
+extern uint64_t kernel_rsp_save;
 // Function signatures
 void scheduler_init();
 int create_process(uint64_t entry_point, uint64_t token);
