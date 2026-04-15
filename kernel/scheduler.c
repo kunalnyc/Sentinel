@@ -66,11 +66,16 @@ void schedule()
             current_process = i;
             process_table[i].state = PROCESS_RUNNING;
 
-            // Set up process stack - leave room for return address
-            uint64_t *proc_stack = &process_table[i].stack[1020];
+            // Set up process stack
+            uint64_t *proc_stack = (uint64_t*)&process_table[i].stack[1020];
             
-            // Align stack to 16 bytes
-            uint64_t proc_rsp = (uint64_t)proc_stack & ~0xFULL;
+            // Push a safe halt loop as return address
+            // When process rets, it lands here and halts
+            extern void process_exit_handler(void);
+            *proc_stack = (uint64_t)process_exit_handler;
+            
+            uint64_t proc_rsp = (uint64_t)proc_stack;
+            proc_rsp &= ~0xFULL;
 
             context_switch(&kernel_rsp_save,
                            process_table[i].rip,
