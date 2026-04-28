@@ -26,7 +26,7 @@ void scheduler_init()
     }
 }
 
-int create_process(uint64_t entry_point, uint64_t token)
+int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
 {
     // SECURITY CHECK FIRST - before anything else!
     // Find process in trust registry by token
@@ -52,8 +52,8 @@ int create_process(uint64_t entry_point, uint64_t token)
     process_table[i].state          = PROCESS_READY;
     process_table[i].rip            = entry_point;
     process_table[i].identity_token = token;
-    process_table[i].burst_time     = 10;   // default — you can pass this as a param later
-    process_table[i].remaining_time = 10;
+    process_table[i].burst_time     = burst_time;      // real value now
+    process_table[i].remaining_time = burst_time;
 
     return process_table[i].pid;
 }

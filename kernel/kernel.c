@@ -20,6 +20,15 @@
 #define STATE_SHELL     1
 
 static int os_state = STATE_DASHBOARD;
+
+// In fs.c or kernel.c, declare these:
+extern uint8_t _binary_programs_proc1_elf_start[];
+extern uint8_t _binary_programs_proc1_elf_end[];
+extern uint8_t _binary_programs_proc2_elf_start[];
+extern uint8_t _binary_programs_proc2_elf_end[];
+extern uint8_t _binary_programs_proc3_elf_start[];
+extern uint8_t _binary_programs_proc3_elf_end[];
+
 // Multiboot2 structures
 struct mb2_tag {
     uint32_t type;

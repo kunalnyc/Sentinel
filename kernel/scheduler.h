@@ -55,7 +55,7 @@ extern uint64_t kernel_rsp_save;
 // Function signatures
 void scheduler_init();
 void process_exit_handler(void);
-int create_process(uint64_t entry_point, uint64_t token);
+int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time);
 void schedule();
 void schedule_sjf();
 

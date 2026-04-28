@@ -3,6 +3,13 @@
 // The entire filesystem lives in RAM
 static slfs_t fs;
 
+// In fs.c or kernel.c, declare these:
+extern uint8_t _binary_programs_proc1_elf_start[];
+extern uint8_t _binary_programs_proc1_elf_end[];
+extern uint8_t _binary_programs_proc2_elf_start[];
+extern uint8_t _binary_programs_proc2_elf_end[];
+extern uint8_t _binary_programs_proc3_elf_start[];
+extern uint8_t _binary_programs_proc3_elf_end[];
 // ── String helpers (no stdlib) ─────────────────────────────
 static int sl_strlen(const char *s)
 {
@@ -87,6 +94,30 @@ void fs_init(void)
     fs_write("kernel.log",
         "KERNEL BOOT OK. ALL SYSTEMS ONLINE.",
         36);
+
+    // Embed proc ELFs into filesystem
+    extern uint8_t _binary_programs_proc1_elf_start[];
+    extern uint8_t _binary_programs_proc1_elf_end[];
+    extern uint8_t _binary_programs_proc2_elf_start[];
+    extern uint8_t _binary_programs_proc2_elf_end[];
+    extern uint8_t _binary_programs_proc3_elf_start[];
+    extern uint8_t _binary_programs_proc3_elf_end[];
+
+    uint32_t s1 = (uint32_t)(_binary_programs_proc1_elf_end
+                           - _binary_programs_proc1_elf_start);
+    uint32_t s2 = (uint32_t)(_binary_programs_proc2_elf_end
+                           - _binary_programs_proc2_elf_start);
+    uint32_t s3 = (uint32_t)(_binary_programs_proc3_elf_end
+                           - _binary_programs_proc3_elf_start);
+
+ fs_create("PROC1");
+fs_write("PROC1", (char*)_binary_programs_proc1_elf_start, s1);
+
+fs_create("PROC2");
+fs_write("PROC2", (char*)_binary_programs_proc2_elf_start, s2);
+
+fs_create("PROC3");
+fs_write("PROC3", (char*)_binary_programs_proc3_elf_start, s3);
 }
 
 int fs_create(const char *name)

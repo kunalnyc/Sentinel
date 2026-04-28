@@ -584,7 +584,7 @@ static void cmd_exec(const char *name)
 
     shell_println("  SIGNATURE VERIFIED. [ OK ]", COL_SUCCESS);
 
-    int pid = create_process(entry, token);
+    int pid = create_process(entry, token, 10); // default burst time
     if(pid < 0)
     {
         shell_println("  ERROR: PROCESS CREATION FAILED.", COL_ERROR);
