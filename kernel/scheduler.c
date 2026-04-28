@@ -28,9 +28,7 @@ void scheduler_init()
 
 int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
 {
-    // SECURITY CHECK FIRST - before anything else!
-    // Find process in trust registry by token
-    int trusted = 0;
+    // ── Find free slot ─────────────────────────────
     int i;
     for(i = 0; i < MAX_PROCESSES; i++)
     {
@@ -38,21 +36,37 @@ int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
             break;
     }
 
-    // Verify token exists in trust registry
-    trusted = verify_process(token, trust_registry[0].hash);
+    if(i == MAX_PROCESSES)
+    {
+        return -1; // ❌ no free slot
+    }
+
+    // ── Trust verification ─────────────────────────
+    int trusted = 0;
+
+    for(int j = 0; j < MAX_PROCESSES; j++)
+    {
+        if(trust_registry[j].hash[0] != 0)
+        {
+            if(verify_process(token, trust_registry[j].hash))
+            {
+                trusted = 1;
+                break;
+            }
+        }
+    }
 
     if(!trusted)
     {
-       // Silent rejection - no println in 64-bit kernel println("SECURITY: Process rejected - unknown token!");
-        return -1; // REJECTED
+        return -1; // ❌ rejected
     }
 
-    // Token verified - create process
+    // ── Create process ─────────────────────────────
     process_table[i].pid            = process_count++;
     process_table[i].state          = PROCESS_READY;
     process_table[i].rip            = entry_point;
     process_table[i].identity_token = token;
-    process_table[i].burst_time     = burst_time;      // real value now
+    process_table[i].burst_time     = burst_time;
     process_table[i].remaining_time = burst_time;
 
     return process_table[i].pid;

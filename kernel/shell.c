@@ -573,7 +573,11 @@ static void cmd_exec(const char *name)
     shell_println("  VERIFYING BINARY SIGNATURE...", COL_DIM);
 
     // Verify against trust registry
-    uint64_t token = 0xDEADBEEFCAFEULL;
+    uint64_t token = 0;
+for(int i = 0; i < 8; i++)
+{
+    token = (token << 8) | elf_hash[i];
+}
     if(!verify_process(token, elf_hash))
     {
         shell_println("  SECURITY: UNTRUSTED BINARY.", COL_ERROR);
