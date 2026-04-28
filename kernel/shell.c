@@ -573,7 +573,11 @@ static void cmd_exec(const char *name)
     shell_println("  VERIFYING BINARY SIGNATURE...", COL_DIM);
 
     // Verify against trust registry
-    uint64_t token = 0xDEADBEEFCAFEULL;
+    uint64_t token = 0;
+for(int i = 0; i < 8; i++)
+{
+    token = (token << 8) | elf_hash[i];
+}
     if(!verify_process(token, elf_hash))
     {
         shell_println("  SECURITY: UNTRUSTED BINARY.", COL_ERROR);
@@ -584,7 +588,7 @@ static void cmd_exec(const char *name)
 
     shell_println("  SIGNATURE VERIFIED. [ OK ]", COL_SUCCESS);
 
-    int pid = create_process(entry, token);
+    int pid = create_process(entry, token, 10); // default burst time
     if(pid < 0)
     {
         shell_println("  ERROR: PROCESS CREATION FAILED.", COL_ERROR);
@@ -647,6 +651,12 @@ static void shell_execute(const char *cmd)
         shell_println("  SCHEDULER TICK EXECUTED.", COL_SUCCESS);
         shell_println("  TYPE PS TO VIEW PROCESS STATES.", COL_DIM);
         shell_println("", COL_OUTPUT);
+    }
+    else if(sl_strcmp(cmd,"SCHEDULESJF")==0)
+    {
+        schedule_sjf();
+        shell_println("  SCHEDULER: SJF TICK EXECUTED.", COL_SUCCESS);
+        shell_println("  SHORTEST JOB RAN FIRST.", COL_DIM);
     }
     else if(sl_strcmp(cmd,"ABOUT")==0)
     {

@@ -29,12 +29,28 @@ kernel/context.o: kernel/context.asm
 sentinel.bin: kernel/boot.o kernel/context.o $(C_OBJECTS)
 	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
 
+programs/proc1_bin.o: programs/proc1.elf
+	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
+		programs/proc1.elf programs/proc1_bin.o
+
+programs/proc2_bin.o: programs/proc2.elf
+	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
+		programs/proc2.elf programs/proc2_bin.o
+
+programs/proc3_bin.o: programs/proc3.elf
+	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
+		programs/proc3.elf programs/proc3_bin.o
 # ── Kernel C objects ──────────────────────────────────────────────────
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # ── Kernel binary ─────────────────────────────────────────────────────
 sentinel.bin: kernel/boot.o $(C_OBJECTS)
+	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
+
+
+sentinel.bin: kernel/boot.o kernel/context.o $(C_OBJECTS) \
+              programs/proc1_bin.o programs/proc2_bin.o programs/proc3_bin.o
 	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
 
 # ── User programs ─────────────────────────────────────────────────────
@@ -44,6 +60,25 @@ programs/hello.o: programs/hello.asm
 programs/hello.elf: programs/hello.o programs/hello.ld
 	$(LD) -T programs/hello.ld -o programs/hello.elf programs/hello.o
 
+programs/proc1.o: programs/proc1.asm
+	$(AS) -f elf64 programs/proc1.asm -o programs/proc1.o
+
+programs/proc1.elf: programs/proc1.o programs/proc.ld
+	$(LD) -T programs/proc.ld -o programs/proc1.elf programs/proc1.o
+
+programs/proc2.o: programs/proc2.asm
+	$(AS) -f elf64 programs/proc2.asm -o programs/proc2.o
+
+programs/proc2.elf: programs/proc2.o programs/proc.ld
+	$(LD) -T programs/proc.ld -o programs/proc2.elf programs/proc2.o
+
+programs/proc3.o: programs/proc3.asm
+	$(AS) -f elf64 programs/proc3.asm -o programs/proc3.o
+
+programs/proc3.elf: programs/proc3.o programs/proc.ld
+	$(LD) -T programs/proc.ld -o programs/proc3.elf programs/proc3.o
+
+all: sentinel.bin programs/hello.elf programs/proc1.elf programs/proc2.elf programs/proc3.elf
 # ── Clean ─────────────────────────────────────────────────────────────
 clean:
 	rm -f sentinel.bin

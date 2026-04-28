@@ -1,17 +1,12 @@
-; context.asm — SentinelOS context switch
-; Simple direct call approach — safe for cooperative switching
-
 BITS 64
 section .text
 global context_switch
+global process_exit_handler
+extern kernel_rsp_save
 
 ; void context_switch(uint64_t *kernel_rsp_save, uint64_t proc_rip, uint64_t proc_rsp)
-; rdi = address to save kernel RSP
-; rsi = process entry RIP  
-; rdx = process stack pointer
-
 context_switch:
-    ; ── Save kernel context ──────────────────────
+    ; Save kernel context
     push rbp
     push rbx
     push r12
@@ -20,13 +15,17 @@ context_switch:
     push r15
     pushfq
 
-    ; Save kernel RSP so we can return later
+    ; Save kernel RSP
     mov [rdi], rsp
 
-    ; ── Set up process stack ─────────────────────
+    ; Switch to process stack
     mov rsp, rdx
 
-    ; Clear registers for clean process start
+    ; Push exit handler so when process rets it lands here
+    lea rax, [rel process_exit_handler]
+    push rax
+
+    ; Clear registers
     xor rax, rax
     xor rbx, rbx
     xor rcx, rcx
@@ -41,5 +40,17 @@ context_switch:
     xor r14, r14
     xor r15, r15
 
-    ; Jump directly to process entry point
+    ; Jump to process entry — ret will land in process_exit_handler
     jmp rsi
+
+process_exit_handler:
+    ; Process returned — restore kernel RSP and resume
+    mov rsp, [rel kernel_rsp_save]
+    popfq
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
