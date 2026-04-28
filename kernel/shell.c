@@ -648,6 +648,12 @@ static void shell_execute(const char *cmd)
         shell_println("  TYPE PS TO VIEW PROCESS STATES.", COL_DIM);
         shell_println("", COL_OUTPUT);
     }
+    else if(sl_strcmp(cmd,"SCHEDULESJF")==0)
+    {
+        schedule_sjf();
+        shell_println("  SCHEDULER: SJF TICK EXECUTED.", COL_SUCCESS);
+        shell_println("  SHORTEST JOB RAN FIRST.", COL_DIM);
+    }
     else if(sl_strcmp(cmd,"ABOUT")==0)
     {
         shell_println("",COL_OUTPUT);

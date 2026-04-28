@@ -52,6 +52,8 @@ int create_process(uint64_t entry_point, uint64_t token)
     process_table[i].state          = PROCESS_READY;
     process_table[i].rip            = entry_point;
     process_table[i].identity_token = token;
+    process_table[i].burst_time     = 10;   // default — you can pass this as a param later
+    process_table[i].remaining_time = 10;
 
     return process_table[i].pid;
 }
@@ -85,4 +87,42 @@ void schedule()
             return;
         }
     }
+}
+
+void schedule_sjf(void)
+{
+    // Find READY process with smallest burst_time
+    int best = -1;
+    uint32_t min_burst = 0xFFFFFFFF;
+
+    int i;
+    for(i = 0; i < MAX_PROCESSES; i++)
+    {
+        if(process_table[i].state == PROCESS_READY)
+        {
+            if(process_table[i].burst_time < min_burst)
+            {
+                min_burst = process_table[i].burst_time;
+                best = i;
+            }
+        }
+    }
+
+    if(best == -1) return;  // no ready processes
+
+    current_process = best;
+    process_table[best].state = PROCESS_RUNNING;
+
+    uint64_t *proc_stack = (uint64_t*)&process_table[best].stack[1020];
+    extern void process_exit_handler(void);
+    *proc_stack = (uint64_t)process_exit_handler;
+
+    uint64_t proc_rsp = (uint64_t)proc_stack;
+    proc_rsp &= ~0xFULL;
+
+    context_switch(&kernel_rsp_save,
+                   process_table[best].rip,
+                   proc_rsp);
+
+    process_table[best].state = PROCESS_DEAD;
 }

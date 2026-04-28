@@ -42,6 +42,9 @@ struct Process {
 
     // Security
     uint64_t identity_token;
+     // Scheduling metadata
+    uint32_t burst_time;      // total CPU time this process needs (ms)
+    uint32_t remaining_time;  // for SRTF later — set equal to burst_time on creation
 };
 
 // Process table
@@ -54,5 +57,6 @@ void scheduler_init();
 void process_exit_handler(void);
 int create_process(uint64_t entry_point, uint64_t token);
 void schedule();
+void schedule_sjf();
 
 #endif
