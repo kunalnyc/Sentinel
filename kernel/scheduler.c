@@ -1,27 +1,29 @@
 #include "scheduler.h"
 #include "../security/trust.h"
 #include <stdint.h>
+
 // Actual definitions
 struct Process process_table[MAX_PROCESSES];
-int process_count = 0;
+int process_count  = 0;
 int current_process = 0;
 uint64_t kernel_rsp_save = 0;
-
 
 // Assembly context switch
 extern void context_switch(uint64_t *kernel_rsp_save,
                            uint64_t proc_rip,
                            uint64_t proc_rsp);
-// forward declaration
-void println(char *str);
 
 void scheduler_init()
 {
     int i = 0;
     while(i < MAX_PROCESSES)
     {
-        process_table[i].pid   = -1;
-        process_table[i].state = PROCESS_DEAD;
+        process_table[i].pid            = -1;
+        process_table[i].state         = PROCESS_DEAD;
+        process_table[i].quantum       = 0;
+        process_table[i].total_ticks   = 0;
+        process_table[i].burst_time    = 0;
+        process_table[i].remaining_time = 0;
         i++;
     }
 }
@@ -35,16 +37,12 @@ int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
         if(process_table[i].pid == -1)
             break;
     }
-
-    if(i == MAX_PROCESSES)
-    {
-        return -1; // ❌ no free slot
-    }
+    if(i == MAX_PROCESSES) return -1;
 
     // ── Trust verification ─────────────────────────
     int trusted = 0;
-
-    for(int j = 0; j < MAX_PROCESSES; j++)
+    int j;
+    for(j = 0; j < MAX_PROCESSES; j++)
     {
         if(trust_registry[j].hash[0] != 0)
         {
@@ -55,11 +53,7 @@ int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
             }
         }
     }
-
-    if(!trusted)
-    {
-        return -1; // ❌ rejected
-    }
+    if(!trusted) return -1;
 
     // ── Create process ─────────────────────────────
     process_table[i].pid            = process_count++;
@@ -68,10 +62,13 @@ int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time)
     process_table[i].identity_token = token;
     process_table[i].burst_time     = burst_time;
     process_table[i].remaining_time = burst_time;
+    process_table[i].quantum        = 0;
+    process_table[i].total_ticks    = 0;
 
     return process_table[i].pid;
 }
 
+// ── FCFS / manual schedule ────────────────────────────────────────────
 void schedule()
 {
     int i;
@@ -80,18 +77,13 @@ void schedule()
         if(process_table[i].state == PROCESS_READY)
         {
             current_process = i;
-            process_table[i].state = PROCESS_RUNNING;
+            process_table[i].state  = PROCESS_RUNNING;
+            process_table[i].quantum = 0;
 
-            // Set up process stack
-            uint64_t *proc_stack = (uint64_t*)&process_table[i].stack[1020];
-            
-            // Push a safe halt loop as return address
-            // When process rets, it lands here and halts
             extern void process_exit_handler(void);
+            uint64_t *proc_stack = (uint64_t*)&process_table[i].stack[1020];
             *proc_stack = (uint64_t)process_exit_handler;
-            
-            uint64_t proc_rsp = (uint64_t)proc_stack;
-            proc_rsp &= ~0xFULL;
+            uint64_t proc_rsp = (uint64_t)proc_stack & ~0xFULL;
 
             context_switch(&kernel_rsp_save,
                            process_table[i].rip,
@@ -103,12 +95,11 @@ void schedule()
     }
 }
 
+// ── SJF schedule ─────────────────────────────────────────────────────
 void schedule_sjf(void)
 {
-    // Find READY process with smallest burst_time
     int best = -1;
     uint32_t min_burst = 0xFFFFFFFF;
-
     int i;
     for(i = 0; i < MAX_PROCESSES; i++)
     {
@@ -121,22 +112,66 @@ void schedule_sjf(void)
             }
         }
     }
-
-    if(best == -1) return;  // no ready processes
+    if(best == -1) return;
 
     current_process = best;
-    process_table[best].state = PROCESS_RUNNING;
+    process_table[best].state  = PROCESS_RUNNING;
+    process_table[best].quantum = 0;
 
-    uint64_t *proc_stack = (uint64_t*)&process_table[best].stack[1020];
     extern void process_exit_handler(void);
+    uint64_t *proc_stack = (uint64_t*)&process_table[best].stack[1020];
     *proc_stack = (uint64_t)process_exit_handler;
-
-    uint64_t proc_rsp = (uint64_t)proc_stack;
-    proc_rsp &= ~0xFULL;
+    uint64_t proc_rsp = (uint64_t)proc_stack & ~0xFULL;
 
     context_switch(&kernel_rsp_save,
                    process_table[best].rip,
                    proc_rsp);
 
     process_table[best].state = PROCESS_DEAD;
+}
+
+// ── Round Robin tick — called from IRQ0 every 10ms ───────────────────
+void schedule_tick(void)
+{
+    // Nothing running — nothing to do
+    if(current_process < 0 || current_process >= MAX_PROCESSES)
+        return;
+    if(process_table[current_process].pid == -1)
+        return;
+    if(process_table[current_process].state != PROCESS_RUNNING)
+        return;
+
+    // Increment quantum and total stats
+    process_table[current_process].quantum++;
+    process_table[current_process].total_ticks++;
+
+    // Update remaining time
+    if(process_table[current_process].remaining_time > 0)
+        process_table[current_process].remaining_time--;
+
+    // Quantum expired — preempt and rotate
+    if(process_table[current_process].quantum >= QUANTUM)
+    {
+        process_table[current_process].quantum = 0;
+        process_table[current_process].state   = PROCESS_READY;
+
+        // Find next READY process — Round Robin wrap
+        int i;
+        for(i = 1; i <= MAX_PROCESSES; i++)
+        {
+            int idx = (current_process + i) % MAX_PROCESSES;
+            if(process_table[idx].state == PROCESS_READY)
+            {
+                current_process = idx;
+                process_table[idx].state  = PROCESS_RUNNING;
+                process_table[idx].quantum = 0;
+                // Full preemptive context switch comes next phase
+                // State is updated — cooperative switch picks it up
+                return;
+            }
+        }
+
+        // No other READY process — current keeps running
+        process_table[current_process].state = PROCESS_RUNNING;
+    }
 }

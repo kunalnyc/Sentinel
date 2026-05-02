@@ -1,6 +1,6 @@
-CC     = gcc
-AS     = nasm
-LD     = ld
+CC = gcc
+AS = nasm
+LD = ld
 
 CFLAGS = -m64 -ffreestanding -fno-builtin -nostdlib -mcmodel=kernel \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
@@ -11,46 +11,31 @@ C_SOURCES = kernel/kernel.c kernel/idt.c kernel/memory.c \
             kernel/scheduler.c kernel/keyboard.c kernel/timer.c \
             kernel/graphics.c kernel/font.c kernel/shell.c \
             kernel/boot_anim.c kernel/fs.c kernel/mouse.c \
-            kernel/mem_mgr.c kernel/elf.c \
+            kernel/mem_mgr.c kernel/elf.c kernel/tss.c \
             security/trust.c security/sha256.c
 
 C_OBJECTS = $(C_SOURCES:.c=.o)
 
 # ── Default target ────────────────────────────────────────────────────
-all: sentinel.bin programs/hello.elf
+all: sentinel.bin programs/hello.elf \
+     programs/proc1.elf programs/proc2.elf programs/proc3.elf
 
-# ── Kernel boot object ────────────────────────────────────────────────
+# ── Kernel ASM objects ────────────────────────────────────────────────
 kernel/boot.o: kernel/boot.asm
 	$(AS) -f elf64 kernel/boot.asm -o kernel/boot.o
 
 kernel/context.o: kernel/context.asm
 	$(AS) -f elf64 kernel/context.asm -o kernel/context.o
 
-sentinel.bin: kernel/boot.o kernel/context.o $(C_OBJECTS)
-	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
+kernel/irq.o: kernel/irq.asm
+	$(AS) -f elf64 kernel/irq.asm -o kernel/irq.o
 
-programs/proc1_bin.o: programs/proc1.elf
-	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
-		programs/proc1.elf programs/proc1_bin.o
-
-programs/proc2_bin.o: programs/proc2.elf
-	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
-		programs/proc2.elf programs/proc2_bin.o
-
-programs/proc3_bin.o: programs/proc3.elf
-	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 \
-		programs/proc3.elf programs/proc3_bin.o
 # ── Kernel C objects ──────────────────────────────────────────────────
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # ── Kernel binary ─────────────────────────────────────────────────────
-sentinel.bin: kernel/boot.o $(C_OBJECTS)
-	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
-
-
-sentinel.bin: kernel/boot.o kernel/context.o $(C_OBJECTS) \
-              programs/proc1_bin.o programs/proc2_bin.o programs/proc3_bin.o
+sentinel.bin: kernel/boot.o kernel/context.o kernel/irq.o $(C_OBJECTS)
 	$(CC) $(CFLAGS) -T kernel/linker.ld -o sentinel.bin $^
 
 # ── User programs ─────────────────────────────────────────────────────
@@ -78,7 +63,6 @@ programs/proc3.o: programs/proc3.asm
 programs/proc3.elf: programs/proc3.o programs/proc.ld
 	$(LD) -T programs/proc.ld -o programs/proc3.elf programs/proc3.o
 
-all: sentinel.bin programs/hello.elf programs/proc1.elf programs/proc2.elf programs/proc3.elf
 # ── Clean ─────────────────────────────────────────────────────────────
 clean:
 	rm -f sentinel.bin
@@ -86,6 +70,5 @@ clean:
 	rm -f bootloader/*.o bootloader/*.bin
 	rm -f $(C_OBJECTS)
 	rm -f programs/*.o programs/*.elf
-	rm -f kernel/*.o
 
 .PHONY: all clean

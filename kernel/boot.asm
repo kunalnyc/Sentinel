@@ -72,11 +72,21 @@ section .data
 saved_magic dd 0
 saved_mbptr dd 0
 
+; Dedicated interrupt stack (16KB)
+align 16
+interrupt_stack_bottom:
+    times 16384 db 0
+interrupt_stack_top:
+
 align 8
 gdt:
-    dq 0
-    dq 0x00AF9A000000FFFF
-    dq 0x00CF92000000FFFF
+    dq 0                        ; 0x00 null
+    dq 0x00AF9A000000FFFF       ; 0x08 kernel code  Ring 0
+    dq 0x00CF92000000FFFF       ; 0x10 kernel data  Ring 0
+    dq 0x00AFFA000000FFFF       ; 0x18 user code    Ring 3
+    dq 0x00CFF2000000FFFF       ; 0x20 user data    Ring 3
+    dq 0                        ; 0x28 TSS low  (filled at runtime)
+    dq 0                        ; 0x30 TSS high (filled at runtime)
 gdt_end:
 gdt_ptr:
     dw gdt_end - gdt - 1

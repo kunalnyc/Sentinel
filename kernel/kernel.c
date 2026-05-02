@@ -15,6 +15,9 @@
 #include "mem_mgr.h"
 #include "hello_elf.h"
 #include "fs.h"
+#include "tss.h"
+#include "proc1_elf.h"
+#include "proc2_elf.h"
 // OS states
 #define STATE_DASHBOARD 0
 #define STATE_SHELL     1
@@ -345,36 +348,65 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
     unsigned char hello_hash[32];
     sha256_compute(programs_hello_elf, programs_hello_elf_len, hello_hash);
     register_process(0xDEADBEEFCAFEULL, "HELLO", hello_hash, TRUST_KERNEL);
+
+
+    // Pre-load PROC1
+fs_create("PROC1");
+fs_write("PROC1", (char*)programs_proc1_elf, programs_proc1_elf_len);
+unsigned char proc1_hash[32];
+sha256_compute(programs_proc1_elf, programs_proc1_elf_len, proc1_hash);
+register_process(0xCAFEBABE0001ULL, "PROC1", proc1_hash, TRUST_KERNEL);
+
+// Pre-load PROC2
+fs_create("PROC2");
+fs_write("PROC2", (char*)programs_proc2_elf, programs_proc2_elf_len);
+unsigned char proc2_hash[32];
+sha256_compute(programs_proc2_elf, programs_proc2_elf_len, proc2_hash);
+register_process(0xCAFEBABE0002ULL, "PROC2", proc2_hash, TRUST_KERNEL);
+
+       // Scheduler + timer (order matters)
+    idt_init();
+   // In kernel_main
+    tss_init(0x70000);
+    scheduler_init();
+    timer_init();
+   
     boot_animation();
     draw_main_screen_highres();
 
     // NO sti, NO keyboard_init - pure polling
-    while(1)
+  while(1)
+{
+    mouse_poll();
+    char c = keyboard_poll();
+    
+    if(os_state == STATE_DASHBOARD)
     {
-        mouse_poll();
-        char c = keyboard_poll();
-        
-        if(os_state == STATE_DASHBOARD)
-        {
-            if(c == '\n') {
-                os_state = STATE_SHELL;
-                clear_screen_graphics(COLOR_SPACE_BLACK);
-                draw_rect(0, 0, screen.width, 20, COLOR_PANEL_BG);
-                draw_line(0, 20, screen.width, 20, COLOR_FORERUNNER_GOLD);
-                draw_string(10, 6, "SENTINELOS TERMINAL", COLOR_FORERUNNER_GOLD);
-                draw_string(screen.width-120, 6, "ESC=DASHBOARD", COLOR_DIM_GOLD);
-                shell_init();
-            }
-        }
-        else if(os_state == STATE_SHELL)
-        {
-            if(c == 27) {
-                os_state = STATE_DASHBOARD;
-                draw_main_screen_highres();
-            }
-            else if(c) {
-                shell_handle_key(c);
-            }
+        if(c == '\n') {
+              // disable during init
+            os_state = STATE_SHELL;
+            clear_screen_graphics(COLOR_SPACE_BLACK);
+            draw_rect(0, 0, screen.width, 20, COLOR_PANEL_BG);
+            draw_line(0, 20, screen.width, 20, COLOR_FORERUNNER_GOLD);
+            draw_string(10, 6, "SENTINELOS TERMINAL", COLOR_FORERUNNER_GOLD);
+            draw_string(screen.width-120, 6, "ESC=DASHBOARD", COLOR_DIM_GOLD);
+            shell_init();
+              // re-enable after init
         }
     }
+    else if(os_state == STATE_SHELL)
+    {
+        if(c == 27) {
+            
+            os_state = STATE_DASHBOARD;
+            draw_main_screen_highres();
+            
+        }
+        else if(c) {
+            
+            shell_handle_key(c);
+            
+        }
+    }
+}
 }
