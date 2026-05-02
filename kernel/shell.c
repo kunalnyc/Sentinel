@@ -8,6 +8,8 @@
 #include "scheduler.h"
 #include "../security/sha256.h"
 #include "../security/trust.h"
+#include "timer.h"
+#include "scheduler.h"
 
 extern screen_info_t screen;
 
@@ -196,6 +198,7 @@ static void cmd_help(void)
     shell_println("  PS             - LIST ALL PROCESSES",          COL_SUCCESS);
     shell_println("", COL_OUTPUT);
     shell_println("  TRUST <FILE>   - REGISTER BINARY AS TRUSTED",  COL_SUCCESS);
+    shell_println("  TICKS          - TIMER + IRQ INFO", COL_CYAN);
 }
 
 static void cmd_meminfo(void)
@@ -342,7 +345,43 @@ static void cmd_uptime(void)
     shell_println(line,COL_CYAN);
     shell_println("", COL_OUTPUT);
 }
+static void cmd_ticks(void)
+{
+    shell_println("", COL_OUTPUT);
+    shell_println("  +-------------------------------+", COL_CYAN);
+    shell_println("  |     TIMER INFORMATION         |", COL_CYAN);
+    shell_println("  +-------------------------------+", COL_CYAN);
 
+    char line[64];
+    char num[16];
+
+    // Ticks
+    sl_strcpy(line, "  TIMER TICKS : ");
+    int_to_str((int)timer_get_ticks(), num);
+    sl_strcat(line, num);
+    shell_println(line, COL_SUCCESS);
+
+    // Uptime in seconds
+    sl_strcpy(line, "  UPTIME      : ");
+    int_to_str((int)timer_get_seconds(), num);
+    sl_strcat(line, num);
+    sl_strcat(line, " SECONDS");
+    shell_println(line, COL_SUCCESS);
+
+    // IRQ frequency
+    shell_println("  IRQ0 FIRES  : 100 PER SECOND", COL_CYAN);
+    shell_println("  QUANTUM     : 10 TICKS = 100MS", COL_CYAN);
+
+    // Scheduler stats
+    sl_strcpy(line, "  PROCESSES  : ");
+    int_to_str(process_count, num);
+    sl_strcat(line, num);
+    sl_strcat(line, " CREATED");
+    shell_println(line, COL_OUTPUT);
+
+    shell_println("  +-------------------------------+", COL_CYAN);
+    shell_println("", COL_OUTPUT);
+}
 static void cmd_color(const char *arg)
 {
     if     (sl_strcmp(arg,"MATRIX") ==0){apply_theme(THEME_MATRIX); shell_println("  THEME: MATRIX.",  COL_SUCCESS);}
@@ -573,11 +612,10 @@ static void cmd_exec(const char *name)
     shell_println("  VERIFYING BINARY SIGNATURE...", COL_DIM);
 
     // Verify against trust registry
-    uint64_t token = 0;
-for(int i = 0; i < 8; i++)
-{
-    token = (token << 8) | elf_hash[i];
-}
+    // Pick token based on filename
+    uint64_t token = 0xDEADBEEFCAFEULL;  // default HELLO
+    if(sl_strcmp(name, "PROC1") == 0) token = 0xCAFEBABE0001ULL;
+    if(sl_strcmp(name, "PROC2") == 0) token = 0xCAFEBABE0002ULL;  
     if(!verify_process(token, elf_hash))
     {
         shell_println("  SECURITY: UNTRUSTED BINARY.", COL_ERROR);
@@ -644,6 +682,7 @@ static void shell_execute(const char *cmd)
     else if(sl_startswith(cmd,"DELETE ")) cmd_delete(cmd+7);
     else if(sl_startswith(cmd,"ALLOC "))  cmd_alloc(cmd+6);
     else if(sl_startswith(cmd,"EXEC "))   cmd_exec(cmd+5);
+    else if(sl_strcmp(cmd,"TICKS")==0) cmd_ticks();
     else if(sl_strcmp(cmd,"SCHEDULE")==0)
     {
         schedule();

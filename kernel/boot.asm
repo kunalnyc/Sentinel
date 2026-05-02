@@ -72,6 +72,12 @@ section .data
 saved_magic dd 0
 saved_mbptr dd 0
 
+; Dedicated interrupt stack (16KB)
+align 16
+interrupt_stack_bottom:
+    times 16384 db 0
+interrupt_stack_top:
+
 align 8
 gdt:
     dq 0                        ; 0x00 null

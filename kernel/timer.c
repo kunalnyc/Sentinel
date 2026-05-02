@@ -67,6 +67,7 @@ void timer_init(void)
     
 
     timer_ticks = 0;
+    
 }
 
 void timer_wait(unsigned int ticks)
