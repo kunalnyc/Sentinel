@@ -15,6 +15,7 @@
 #include "mem_mgr.h"
 #include "hello_elf.h"
 #include "fs.h"
+#include "tss.h"
 // OS states
 #define STATE_DASHBOARD 0
 #define STATE_SHELL     1
@@ -348,6 +349,8 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
 
        // Scheduler + timer (order matters)
     idt_init();
+    // Set up TSS with kernel stack
+    tss_init(0x90000);  // use boot stack address as kernel stack
     scheduler_init();
     timer_init();
    

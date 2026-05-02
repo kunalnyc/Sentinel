@@ -11,7 +11,7 @@ C_SOURCES = kernel/kernel.c kernel/idt.c kernel/memory.c \
             kernel/scheduler.c kernel/keyboard.c kernel/timer.c \
             kernel/graphics.c kernel/font.c kernel/shell.c \
             kernel/boot_anim.c kernel/fs.c kernel/mouse.c \
-            kernel/mem_mgr.c kernel/elf.c \
+            kernel/mem_mgr.c kernel/elf.c kernel/tss.c \
             security/trust.c security/sha256.c
 
 C_OBJECTS = $(C_SOURCES:.c=.o)
