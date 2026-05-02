@@ -345,6 +345,12 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
     unsigned char hello_hash[32];
     sha256_compute(programs_hello_elf, programs_hello_elf_len, hello_hash);
     register_process(0xDEADBEEFCAFEULL, "HELLO", hello_hash, TRUST_KERNEL);
+
+       // Scheduler + timer (order matters)
+    idt_init();
+    scheduler_init();
+    timer_init();
+   
     boot_animation();
     draw_main_screen_highres();
 

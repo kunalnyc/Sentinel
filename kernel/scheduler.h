@@ -12,15 +12,18 @@
 // Maximum processes
 #define MAX_PROCESSES 64
 
+// Round Robin quantum — ticks per process (100Hz = 10ms per tick)
+#define QUANTUM 10   // 10 ticks = 100ms per process
+
 // Process Control Block (64-bit)
 struct Process {
     int      pid;
     int      state;
 
     // 64-bit registers
-    uint64_t rip;       // instruction pointer (was eip)
-    uint64_t rsp;       // stack pointer       (was esp)
-    uint64_t rbp;       // base pointer        (was ebp)
+    uint64_t rip;
+    uint64_t rsp;
+    uint64_t rbp;
     uint64_t rax;
     uint64_t rbx;
     uint64_t rcx;
@@ -42,9 +45,12 @@ struct Process {
 
     // Security
     uint64_t identity_token;
-     // Scheduling metadata
-    uint32_t burst_time;      // total CPU time this process needs (ms)
-    uint32_t remaining_time;  // for SRTF later — set equal to burst_time on creation
+
+    // Scheduling metadata
+    uint32_t burst_time;      // total CPU time needed
+    uint32_t remaining_time;  // for SRTF
+    uint32_t quantum;         // ticks used in current slot (Round Robin)
+    uint32_t total_ticks;     // total ticks consumed (stats)
 };
 
 // Process table
@@ -52,11 +58,13 @@ extern struct Process process_table[MAX_PROCESSES];
 extern int process_count;
 extern int current_process;
 extern uint64_t kernel_rsp_save;
+
 // Function signatures
 void scheduler_init();
 void process_exit_handler(void);
-int create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time);
+int  create_process(uint64_t entry_point, uint64_t token, uint32_t burst_time);
 void schedule();
-void schedule_sjf();
+void schedule_sjf(void);
+void schedule_tick(void);   // called from IRQ0 every timer tick
 
 #endif
