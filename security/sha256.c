@@ -127,7 +127,33 @@ void sha256_compute(unsigned char *data, unsigned int len, unsigned char *output
 {
     struct SHA256Context ctx;
     sha256_init(&ctx);
-    sha256_transform(&ctx, data);
+
+    // ── Prepare padded 64-byte block ──────────────────
+    unsigned char block[64];
+    unsigned int i;
+
+    // Zero the block
+    for(i = 0; i < 64; i++) block[i] = 0;
+
+    // Copy message bytes
+    for(i = 0; i < len && i < 55; i++)
+        block[i] = data[i];
+
+    // Append 0x80 padding byte
+    block[len] = 0x80;
+
+    // Append length in bits as 64-bit big-endian
+    // Length in bits = len * 8
+    unsigned int bit_len = len * 8;
+    block[63] = bit_len & 0xFF;
+    block[62] = (bit_len >> 8) & 0xFF;
+    block[61] = (bit_len >> 16) & 0xFF;
+    block[60] = (bit_len >> 24) & 0xFF;
+
+    // Transform the single padded block
+    sha256_transform(&ctx, block);
+
+    // Output the hash
     sha256_final(&ctx, output);
 }
 

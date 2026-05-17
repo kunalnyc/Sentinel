@@ -350,6 +350,14 @@ void kernel_main(unsigned int magic, unsigned int mb_addr)
     sha256_compute(programs_hello_elf, programs_hello_elf_len, hello_hash);
     register_process(0xDEADBEEFCAFEULL, "HELLO", hello_hash, TRUST_KERNEL);
 
+    // DEBUG — print sentinel password hash
+unsigned char test_hash[32];
+unsigned char test_pass[] = "sentinel";
+sha256_compute(test_pass, 8, test_hash);
+// Store in a known memory location so we can read it
+volatile unsigned char *debug_hash = (volatile unsigned char*)0x200000;
+int dhi;
+for(dhi = 0; dhi < 32; dhi++) debug_hash[dhi] = test_hash[dhi];
 
     // Pre-load PROC1
 fs_create("PROC1");

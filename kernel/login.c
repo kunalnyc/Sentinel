@@ -10,12 +10,11 @@
 // SHA-256 of "sentinel":
 // Change this hash to change the password
 static const unsigned char PASSWORD_HASH[32] = {
-    0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65,
-    0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15,
-    0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0x0b, 0x82, 0x2c,
-    0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0x0a, 0x08
+    0x2b, 0x78, 0x47, 0xb7, 0xb7, 0x05, 0x78, 0x1d,
+    0x7c, 0xf2, 0x1a, 0x05, 0xe9, 0xc1, 0xbb, 0x37,
+    0xcb, 0xf0, 0x78, 0xae, 0xa1, 0x03, 0xbc, 0x3e,
+    0xdc, 0xc6, 0xac, 0xa5, 0x2a, 0xb6, 0x54, 0x53
 };
-
 // ── Scaled font renderer ──────────────────────────────────────────────
 // CS Theory: Nearest-neighbor scaling — each pixel becomes scale×scale block
 // Time complexity: O(chars × 8 × 8 × scale²)
@@ -302,6 +301,8 @@ int login_run(void)
                            (unsigned int)pass_len,
                            entered_hash);
 
+                           // Show entered hash vs stored hash
+ // DEBUG — show hash bytes on screen
             if(lg_strcmp(entered_hash, PASSWORD_HASH, 32))
             {
                 // ── SUCCESS ───────────────────────────────────────────
@@ -387,6 +388,8 @@ int login_run(void)
         }
         else if(pass_len < 63 && c >= 32 && c < 127)
         {
+            // Convert uppercase to lowercase
+          // Show ASCII value for debug
             // Add character
             password[pass_len++] = c;
             password[pass_len]   = 0;
