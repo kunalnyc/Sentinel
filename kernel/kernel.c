@@ -9,6 +9,7 @@
 #include "font.h"
 #include "io.h"
 #include <stdint.h>
+#include "login.h"
 #include "shell.h"
 #include "boot_anim.h"
 #include "mouse.h"
@@ -379,11 +380,13 @@ register_process(0xCAFEBABE0002ULL, "PROC2", proc2_hash, TRUST_KERNEL);
 {
     mouse_poll();
     char c = keyboard_poll();
-    
-    if(os_state == STATE_DASHBOARD)
-    {
-        if(c == '\n') {
-              // disable during init
+  if(os_state == STATE_DASHBOARD)
+  {
+    if(c == '\n') {
+        // Run login screen first
+        int result = login_run();
+        if(result == LOGIN_SUCCESS)
+        {
             os_state = STATE_SHELL;
             clear_screen_graphics(COLOR_SPACE_BLACK);
             draw_rect(0, 0, screen.width, 20, COLOR_PANEL_BG);
@@ -391,9 +394,9 @@ register_process(0xCAFEBABE0002ULL, "PROC2", proc2_hash, TRUST_KERNEL);
             draw_string(10, 6, "SENTINELOS TERMINAL", COLOR_FORERUNNER_GOLD);
             draw_string(screen.width-120, 6, "ESC=DASHBOARD", COLOR_DIM_GOLD);
             shell_init();
-              // re-enable after init
         }
     }
+}
     else if(os_state == STATE_SHELL)
     {
         if(c == 27) {
